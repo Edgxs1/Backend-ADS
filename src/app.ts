@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import { errorMiddleware, notFoundMiddleware } from './middlewares/error.middleware.js';
+import { apiRouter } from './routes.js';
 
 const app = express();
 
@@ -12,7 +14,11 @@ app.get('/api/v1/health', (_req, res) => {
   res.status(200).json({ status: 'OK', message: 'API de Obra Pública funcionando' });
 });
 
-// Aquí iremos inyectando las rutas de tus módulos (Auth, Admin, etc.)
-// app.use('/api/v1/admin', adminRoutes);
+// Rutas de los módulos
+app.use('/api/v1', apiRouter);
+
+// Manejo centralizado de rutas no encontradas y errores
+app.use(notFoundMiddleware);
+app.use(errorMiddleware);
 
 export default app;

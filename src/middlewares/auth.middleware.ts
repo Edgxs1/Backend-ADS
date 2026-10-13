@@ -1,7 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { supabase } from '../config/supabase.js';
 import { AppError } from '../shared/errors/AppError.js';
-import type { Rol } from '../shared/types/roles.js';
 
 const BEARER_PREFIX = 'Bearer ';
 
@@ -32,8 +31,8 @@ export async function authMiddleware(
     req.user = {
       id: data.user.id,
       email: data.user.email ?? null,
-      rol: (data.user.app_metadata?.rol as Rol | undefined) ?? null,
     };
+    req.accessToken = token;
 
     next();
   } catch (error) {
