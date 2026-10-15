@@ -1,21 +1,28 @@
 import express from 'express';
 import cors from 'cors';
+import { env } from './config/env.js';
 import { errorMiddleware, notFoundMiddleware } from './middlewares/error.middleware.js';
-import { apiRouter } from './routes.js';
+import { authRouter } from './routes/auth.routes.js';
+import { obraRouter } from './routes/obra.routes.js';
+import { adminRouter } from './routes/admin.routes.js';
+import { usuariosRouter } from './routes/usuarios.routes.js';
 
 const app = express();
 
 // Middlewares globales
-app.use(cors());
+app.use(cors({ origin: env.FRONTEND_URL }));
 app.use(express.json());
 
 // Ruta de prueba (Health Check)
 app.get('/api/v1/health', (_req, res) => {
-  res.status(200).json({ status: 'OK', message: 'API de Obra Pública funcionando' });
+  res.status(200).json({ success: true, data: { message: 'API OK' } });
 });
 
 // Rutas de los módulos
-app.use('/api/v1', apiRouter);
+app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/usuarios', usuariosRouter);
+app.use('/api/v1/obras', obraRouter);
+app.use('/api/v1/admin', adminRouter);
 
 // Manejo centralizado de rutas no encontradas y errores
 app.use(notFoundMiddleware);

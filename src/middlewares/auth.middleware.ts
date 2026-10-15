@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { supabase } from '../config/supabase.js';
+import { supabaseAdmin } from '../config/supabase.js';
 import { AppError } from '../shared/errors/AppError.js';
 
 const BEARER_PREFIX = 'Bearer ';
@@ -22,7 +22,7 @@ export async function authMiddleware(
       throw new AppError(401, 'No autorizado: token vacío');
     }
 
-    const { data, error } = await supabase.auth.getUser(token);
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !data.user) {
       throw new AppError(401, 'No autorizado: token inválido o expirado');

@@ -2,14 +2,21 @@ import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from './env.js';
 
-export const supabase: SupabaseClient = createClient(
+export const supabaseAdmin: SupabaseClient = createClient(
   env.SUPABASE_URL,
-  env.SUPABASE_ANON_KEY,
+  env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false } },
 );
 
-export function createUserClient(accessToken: string): SupabaseClient {
+export function createAnonClient(): SupabaseClient {
   return createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+export function createSupabaseClient(token: string): SupabaseClient {
+  return createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
