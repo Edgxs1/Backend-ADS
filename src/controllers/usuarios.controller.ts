@@ -6,11 +6,11 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
   try {
     const user = req.user;
 
-    if (!user || !req.accessToken) {
+    if (!user) {
       throw new AppError(401, 'No autorizado: usuario no autenticado');
     }
 
-    const perfil = await obtenerPerfil(user.id, req.accessToken);
+    const perfil = await obtenerPerfil(user.id);
 
     res.status(200).json({ success: true, data: perfil });
   } catch (error) {

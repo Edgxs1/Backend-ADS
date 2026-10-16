@@ -32,7 +32,6 @@ export async function authMiddleware(
       id: data.user.id,
       email: data.user.email ?? null,
     };
-    req.accessToken = token;
 
     next();
   } catch (error) {

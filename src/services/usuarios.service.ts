@@ -10,11 +10,8 @@ export interface PerfilUsuario {
   rol: Rol | null;
 }
 
-export async function obtenerPerfil(
-  idUsuario: string,
-  accessToken: string,
-): Promise<PerfilUsuario> {
-  const usuario = await findUsuarioPorId(idUsuario, accessToken);
+export async function obtenerPerfil(idUsuario: string): Promise<PerfilUsuario> {
+  const usuario = await findUsuarioPorId(idUsuario);
 
   if (!usuario) {
     throw new AppError(404, 'Usuario no encontrado en el sistema');

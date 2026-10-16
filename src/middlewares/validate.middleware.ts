@@ -15,3 +15,19 @@ export function validateBody<T>(schema: ZodType<T>): RequestHandler {
     next();
   };
 }
+
+export function validateParams<T extends Record<string, string>>(
+  schema: ZodType<T>,
+): RequestHandler {
+  return (req, _res, next) => {
+    const result = schema.safeParse(req.params);
+
+    if (!result.success) {
+      next(new AppError(400, 'Parámetros de ruta inválidos', result.error.issues));
+      return;
+    }
+
+    req.params = result.data;
+    next();
+  };
+}

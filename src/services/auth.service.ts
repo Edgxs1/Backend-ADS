@@ -51,7 +51,6 @@ export async function restablecerPassword(
   const { error } = await supabaseAdmin.auth.admin.updateUserById(idUsuario, {
     password,
   });
-  console.log('Error al restablecer la contraseña:', error); // Agrega este log para depuración
 
   if (error) {
     throw new AppError(400, 'No se pudo restablecer la contraseña');

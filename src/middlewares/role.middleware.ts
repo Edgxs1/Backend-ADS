@@ -34,18 +34,14 @@ export function roleMiddleware(...args: Array<Rol | RoleOptions>): RequestHandle
         throw new AppError(401, 'No autorizado: usuario no autenticado');
       }
 
-      if (!req.accessToken) {
-        throw new AppError(401, 'No autorizado: token ausente');
-      }
-
-      const usuario = await findUsuarioPorId(user.id, req.accessToken);
+      const usuario = await findUsuarioPorId(user.id);
       const rol = usuario ? ROL_BY_ID[usuario.id_rol] : undefined;
 
       if (!rol || !allowedRoles.includes(rol)) {
         throw new AppError(403, 'Acceso denegado: no tienes el rol requerido');
       }
 
-      if (scope === 'global') {
+      if (rol === 'Administrador' || scope === 'global') {
         next();
         return;
       }
@@ -57,7 +53,7 @@ export function roleMiddleware(...args: Array<Rol | RoleOptions>): RequestHandle
         return;
       }
 
-      const asignacion = await findAsignacionActiva(user.id, idObra, req.accessToken);
+      const asignacion = await findAsignacionActiva(user.id, idObra);
 
       if (!asignacion) {
         throw new AppError(403, 'Acceso denegado: no estás asignado a esta obra');

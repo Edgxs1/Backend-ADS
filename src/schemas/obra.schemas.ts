@@ -6,4 +6,8 @@ export const crearObraSchema = z.object({
   num_habitaciones: z.number().int().nonnegative().optional(),
 });
 
+export const obraIdParamsSchema = z.object({
+  id: z.uuid(),
+});
+
 export type CrearObraDto = z.infer<typeof crearObraSchema>;

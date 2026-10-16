@@ -1,4 +1,4 @@
-import { createSupabaseClient } from '../config/supabase.js';
+import { supabaseAdmin } from '../config/supabase.js';
 import { AppError } from '../shared/errors/AppError.js';
 
 export interface UsuarioRol {
@@ -7,13 +7,8 @@ export interface UsuarioRol {
   id_rol: number;
 }
 
-export async function findUsuarioPorId(
-  idUsuario: string,
-  accessToken: string,
-): Promise<UsuarioRol | null> {
-  const supabase = createSupabaseClient(accessToken);
-
-  const { data, error } = await supabase
+export async function findUsuarioPorId(idUsuario: string): Promise<UsuarioRol | null> {
+  const { data, error } = await supabaseAdmin
     .from('usuarios')
     .select('id_usuario, correo, id_rol')
     .eq('id_usuario', idUsuario)

@@ -1,4 +1,4 @@
-import { createSupabaseClient } from '../config/supabase.js';
+import { supabaseAdmin } from '../config/supabase.js';
 import { ESTADO_ASIGNACION_ACTIVO } from '../shared/constants/asignaciones.js';
 import { AppError } from '../shared/errors/AppError.js';
 
@@ -9,11 +9,8 @@ export interface AsignacionActiva {
 export async function findAsignacionActiva(
   idUsuario: string,
   idObra: string,
-  accessToken: string,
 ): Promise<AsignacionActiva | null> {
-  const supabase = createSupabaseClient(accessToken);
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('asignaciones_obra')
     .select('id_asignacion')
     .eq('id_usuario', idUsuario)
