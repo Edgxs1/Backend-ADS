@@ -23,6 +23,17 @@ export interface Asignacion {
   estado: string;
 }
 
+export interface UsuarioListado {
+  id_usuario: string;
+  correo: string;
+  id_rol: number | null;
+}
+
+export interface AsignacionConUsuario extends Asignacion {
+  correo: string;
+  id_rol: number | null;
+}
+
 export interface CrearAsignacionInput {
   id_usuario: string;
   id_obra: string;
@@ -118,4 +129,65 @@ export async function crearAsignacion(input: CrearAsignacionInput): Promise<Asig
   }
 
   return data as Asignacion;
+}
+
+export async function listarUsuarios(): Promise<UsuarioListado[]> {
+  const { data, error } = await supabaseAdmin
+    .from('usuarios')
+    .select('id_usuario, correo, id_rol')
+    .order('correo', { ascending: true });
+
+  if (error) {
+    throw new AppError(500, 'No se pudieron obtener los usuarios');
+  }
+
+  return (data ?? []) as UsuarioListado[];
+}
+
+export async function listarAsignacionesPorObra(
+  idObra: string,
+): Promise<AsignacionConUsuario[]> {
+  const { data: asignaciones, error } = await supabaseAdmin
+    .from('asignaciones_obra')
+    .select(ASIGNACION_COLUMNS)
+    .eq('id_obra', idObra)
+    .order('fecha_inicio', { ascending: false });
+
+  if (error) {
+    throw new AppError(500, 'No se pudieron obtener las asignaciones de la obra');
+  }
+
+  const filas = (asignaciones ?? []) as Asignacion[];
+
+  if (filas.length === 0) {
+    return [];
+  }
+
+  const idsUsuario = [...new Set(filas.map((fila) => String(fila.id_usuario)))];
+
+  const { data: usuarios, error: usuariosError } = await supabaseAdmin
+    .from('usuarios')
+    .select('id_usuario, correo, id_rol')
+    .in('id_usuario', idsUsuario);
+
+  if (usuariosError) {
+    throw new AppError(500, 'No se pudieron obtener los usuarios asignados');
+  }
+
+  const usuariosPorId = new Map(
+    ((usuarios ?? []) as UsuarioListado[]).map((usuario) => [
+      String(usuario.id_usuario),
+      usuario,
+    ]),
+  );
+
+  return filas.map((fila) => {
+    const usuario = usuariosPorId.get(String(fila.id_usuario));
+
+    return {
+      ...fila,
+      correo: usuario?.correo ?? 'Usuario desconocido',
+      id_rol: usuario?.id_rol ?? null,
+    };
+  });
 }

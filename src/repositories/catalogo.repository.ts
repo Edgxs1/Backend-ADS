@@ -7,6 +7,7 @@ export interface Concepto {
   id_partida: string;
   tipo: string;
   clave: string;
+  descripcion: string;
   unidad_medida: string;
   cantidad: number;
   precio_unitario: number;
@@ -21,6 +22,7 @@ export interface CrearConceptoInput {
   id_partida: string;
   tipo: string;
   clave: string;
+  descripcion: string;
   unidad_medida: string;
   cantidad: number;
   precio_unitario: number;
@@ -45,7 +47,7 @@ function extraerPartidaClave(
 }
 
 const COLUMNS =
-  'id_concepto, id_obra, id_partida, tipo, clave, unidad_medida, cantidad, precio_unitario, importe_total';
+  'id_concepto, id_obra, id_partida, tipo, clave, descripcion, unidad_medida, cantidad, precio_unitario, importe_total';
 
 export async function crearConcepto(
   idObra: string,
@@ -60,6 +62,7 @@ export async function crearConcepto(
       id_partida: input.id_partida,
       tipo: input.tipo,
       clave: input.clave,
+      descripcion: input.descripcion,
       unidad_medida: input.unidad_medida,
       cantidad: input.cantidad,
       precio_unitario: input.precio_unitario,

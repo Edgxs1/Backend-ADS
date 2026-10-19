@@ -9,6 +9,7 @@ export interface Archivo {
   id_subido_por: string;
   tipo_documento: string;
   url_archivo: string;
+  created_at: string;
 }
 
 export interface CrearArchivoInput {
@@ -18,7 +19,8 @@ export interface CrearArchivoInput {
   url_archivo: string;
 }
 
-const COLUMNS = 'id_archivo, id_obra, id_subido_por, tipo_documento, url_archivo';
+const COLUMNS =
+  'id_archivo, id_obra, id_subido_por, tipo_documento, url_archivo, created_at';
 
 function extraerRutaStorage(url: string): string | null {
   const marcador = `/${BUCKET_EXPEDIENTES}/`;

@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const crearUsuarioSchema = z.object({
   email: z.email(),
+  id_rol: z.number().int().min(1).max(5).optional(),
+  password: z.string().min(6).max(72).optional(),
 });
 
 export const asignarSchema = z.object({
@@ -15,6 +17,10 @@ export const actualizarRolSchema = z.object({
 
 export const idUsuarioParamsSchema = z.object({
   id_usuario: z.uuid(),
+});
+
+export const idObraParamsSchema = z.object({
+  id_obra: z.uuid(),
 });
 
 export type CrearUsuarioDto = z.infer<typeof crearUsuarioSchema>;

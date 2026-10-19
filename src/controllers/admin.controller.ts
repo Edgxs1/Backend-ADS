@@ -8,14 +8,48 @@ import {
   actualizarRolUsuario as actualizarRolUsuarioService,
   asignarUsuario as asignarUsuarioService,
   crearUsuario as crearUsuarioService,
+  listarAsignacionesObra,
+  listarUsuarios as listarUsuariosService,
 } from '../services/admin.service.js';
 import { AppError } from '../shared/errors/AppError.js';
 
 export async function crearUsuario(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { email } = req.body as CrearUsuarioDto;
-    const usuario = await crearUsuarioService(email);
+    const usuario = await crearUsuarioService(req.body as CrearUsuarioDto);
     res.status(201).json({ success: true, data: usuario });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listarUsuarios(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const usuarios = await listarUsuariosService();
+    res.status(200).json({ success: true, data: usuarios });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listarAsignaciones(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const rawId = req.params['id_obra'];
+    const idObra = Array.isArray(rawId) ? rawId[0] : rawId;
+
+    if (!idObra) {
+      throw new AppError(400, 'Falta el id de la obra');
+    }
+
+    const asignaciones = await listarAsignacionesObra(idObra);
+    res.status(200).json({ success: true, data: asignaciones });
   } catch (error) {
     next(error);
   }
