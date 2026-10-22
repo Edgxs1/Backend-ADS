@@ -8,6 +8,9 @@ const envSchema = z.object({
   SUPABASE_URL: z.url(),
   SUPABASE_ANON_KEY: z.string().min(1, 'SUPABASE_ANON_KEY es obligatoria'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY es obligatoria'),
+  FIRMA_SALT: z
+    .string()
+    .min(32, 'FIRMA_SALT es obligatoria y debe tener al menos 32 caracteres'),
 });
 
 const result = envSchema.safeParse(process.env);

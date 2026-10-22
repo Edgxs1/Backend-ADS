@@ -11,6 +11,8 @@ import { archivoRouter } from './routes/archivo.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
 import { usuariosRouter } from './routes/usuarios.routes.js';
 import { reporteRouter } from './routes/reporte.routes.js';
+import { bitacoraRouter } from './routes/bitacora.routes.js';
+import { estimacionRouter } from './routes/estimacion.routes.js';
 
 const app = express();
 
@@ -31,6 +33,8 @@ app.use('/api/v1/obras', contratoRouter);
 app.use('/api/v1/obras', catalogoRouter);
 app.use('/api/v1/obras', partidaRouter);
 app.use('/api/v1/obras', reporteRouter);
+app.use('/api/v1/obras', bitacoraRouter);
+app.use('/api/v1/obras', estimacionRouter);
 app.use('/api/v1/obras', obraRouter);
 app.use('/api/v1/admin', adminRouter);
 
