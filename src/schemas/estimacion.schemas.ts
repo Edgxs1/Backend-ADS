@@ -4,7 +4,8 @@ export const TIPOS_ESTIMACION = ['Ordinaria', 'Extraordinaria', 'Adicional'] as 
 
 export const ESTADOS_ESTIMACION = [
   'Borrador',
-  'En revisión',
+  'Revision Supervisor',
+  'Revision Residente',
   'Autorizada',
   'Rechazada',
 ] as const;

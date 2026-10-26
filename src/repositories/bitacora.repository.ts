@@ -11,6 +11,9 @@ export interface NotaBitacora {
   texto: string;
   estado: string;
   created_at: string;
+  firma_superintendente: string | null;
+  firma_supervisor: string | null;
+  firma_residente: string | null;
 }
 
 export interface NotaConCreador extends NotaBitacora {
@@ -41,7 +44,8 @@ function extraerCorreo(
   return usuario.correo ?? null;
 }
 
-const COLUMNS = 'id_nota, id_obra, id_creador, texto, estado, created_at';
+const COLUMNS =
+  'id_nota, id_obra, id_creador, texto, estado, created_at, firma_superintendente, firma_supervisor, firma_residente';
 
 export async function crearNota(input: CrearNotaInput): Promise<NotaBitacora> {
   const { data, error } = await supabaseAdmin
@@ -51,6 +55,9 @@ export async function crearNota(input: CrearNotaInput): Promise<NotaBitacora> {
       id_creador: input.id_creador,
       texto: input.texto,
       estado: ESTADO_ABIERTA,
+      firma_superintendente: null,
+      firma_supervisor: null,
+      firma_residente: null,
     })
     .select(COLUMNS)
     .single();
@@ -110,6 +117,31 @@ export async function actualizarTextoNota(
 
   if (error || !data) {
     throw new AppError(404, 'No se encontró la nota para actualizar');
+  }
+
+  return data as NotaBitacora;
+}
+
+export async function firmarNotaRepo(
+  idNota: string,
+  columnaFirma: 'firma_superintendente' | 'firma_supervisor' | 'firma_residente',
+  hash: string,
+  estado: string,
+): Promise<NotaBitacora> {
+  const payload: Record<string, string> = {
+    [columnaFirma]: hash,
+    estado,
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from('bitacora_notas')
+    .update(payload)
+    .eq('id_nota', idNota)
+    .select(COLUMNS)
+    .single();
+
+  if (error || !data) {
+    throw new AppError(404, 'No se encontró la nota para firmar');
   }
 
   return data as NotaBitacora;

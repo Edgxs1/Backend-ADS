@@ -6,6 +6,7 @@ import {
   crear,
   eliminar,
   enviar,
+  enviarResidente,
   listar,
   rechazar,
 } from '../controllers/estimacion.controller.js';
@@ -47,11 +48,27 @@ estimacionRouter.get(
 );
 
 estimacionRouter.patch(
+  '/:id_obra/estimaciones/:id_estimacion/enviar-supervisor',
+  authMiddleware,
+  validateParams(estimacionParamsSchema),
+  roleMiddleware('Superintendente', { scope: 'obra' }),
+  enviar,
+);
+
+estimacionRouter.patch(
   '/:id_obra/estimaciones/:id_estimacion/enviar',
   authMiddleware,
   validateParams(estimacionParamsSchema),
   roleMiddleware('Superintendente', { scope: 'obra' }),
   enviar,
+);
+
+estimacionRouter.patch(
+  '/:id_obra/estimaciones/:id_estimacion/enviar-residente',
+  authMiddleware,
+  validateParams(estimacionParamsSchema),
+  roleMiddleware('Supervisor', { scope: 'obra' }),
+  enviarResidente,
 );
 
 estimacionRouter.patch(

@@ -1,3 +1,4 @@
+import { eliminarAsignacionesUsuarioObra } from '../repositories/asignaciones.repository.js';
 import {
   crearObra,
   desactivarObra,
@@ -33,5 +34,16 @@ export async function eliminarObra(idObra: string): Promise<void> {
 
   if (!desactivada) {
     throw new AppError(404, 'Obra no encontrada o ya inactiva');
+  }
+}
+
+export async function desasignarUsuarioDeObra(
+  idObra: string,
+  idUsuario: string,
+): Promise<void> {
+  const eliminadas = await eliminarAsignacionesUsuarioObra(idUsuario, idObra);
+
+  if (eliminadas === 0) {
+    throw new AppError(404, 'El usuario no está asignado a esta obra');
   }
 }

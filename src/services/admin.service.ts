@@ -8,6 +8,7 @@ import {
   listarAsignacionesPorObra,
   listarUsuarios as listarUsuariosRepo,
 } from '../repositories/admin.repository.js';
+import { actualizarEstadoUsuario as actualizarEstadoUsuarioRepo } from '../repositories/usuarios.repository.js';
 import type { Asignacion, UsuarioPublico } from '../repositories/admin.repository.js';
 import type {
   ActualizarRolDto,
@@ -23,6 +24,10 @@ export interface UsuarioAdmin {
   correo: string;
   id_rol: number | null;
   rol: Rol | null;
+  rfc: string | null;
+  telefono: string | null;
+  cedula_profesional: string | null;
+  activo: boolean;
 }
 
 export interface AsignacionAdmin extends Asignacion {
@@ -58,6 +63,10 @@ export async function crearUsuario(input: CrearUsuarioDto): Promise<UsuarioAdmin
       correo: actualizado.correo,
       id_rol: actualizado.id_rol,
       rol: nombreRol(actualizado.id_rol),
+      rfc: actualizado.rfc,
+      telefono: actualizado.telefono,
+      cedula_profesional: actualizado.cedula_profesional,
+      activo: actualizado.activo,
     };
   }
 
@@ -66,6 +75,10 @@ export async function crearUsuario(input: CrearUsuarioDto): Promise<UsuarioAdmin
     correo: publico.correo,
     id_rol: null,
     rol: null,
+    rfc: null,
+    telefono: null,
+    cedula_profesional: null,
+    activo: true,
   };
 }
 
@@ -77,7 +90,29 @@ export async function listarUsuarios(): Promise<UsuarioAdmin[]> {
     correo: usuario.correo,
     id_rol: usuario.id_rol,
     rol: nombreRol(usuario.id_rol),
+    rfc: usuario.rfc,
+    telefono: usuario.telefono,
+    cedula_profesional: usuario.cedula_profesional,
+    activo: usuario.activo,
   }));
+}
+
+export async function actualizarEstadoUsuario(
+  idUsuario: string,
+  activo: boolean,
+): Promise<UsuarioAdmin> {
+  const actualizado = await actualizarEstadoUsuarioRepo(idUsuario, activo);
+
+  return {
+    id_usuario: actualizado.id_usuario,
+    correo: actualizado.correo,
+    id_rol: actualizado.id_rol,
+    rol: nombreRol(actualizado.id_rol),
+    rfc: actualizado.rfc,
+    telefono: actualizado.telefono,
+    cedula_profesional: actualizado.cedula_profesional,
+    activo: actualizado.activo,
+  };
 }
 
 export async function actualizarRolUsuario(
@@ -91,6 +126,10 @@ export async function actualizarRolUsuario(
     correo: actualizado.correo,
     id_rol: actualizado.id_rol,
     rol: nombreRol(actualizado.id_rol),
+    rfc: actualizado.rfc,
+    telefono: actualizado.telefono,
+    cedula_profesional: actualizado.cedula_profesional,
+    activo: actualizado.activo,
   };
 }
 

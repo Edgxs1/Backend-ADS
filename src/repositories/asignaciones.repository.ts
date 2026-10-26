@@ -6,6 +6,23 @@ export interface AsignacionActiva {
   id_asignacion: string;
 }
 
+export async function eliminarAsignacionesUsuarioObra(
+  idUsuario: string,
+  idObra: string,
+): Promise<number> {
+  const { error, count } = await supabaseAdmin
+    .from('asignaciones_obra')
+    .delete({ count: 'exact' })
+    .eq('id_usuario', idUsuario)
+    .eq('id_obra', idObra);
+
+  if (error) {
+    throw new AppError(500, 'No se pudo desvincular al usuario de la obra');
+  }
+
+  return count ?? 0;
+}
+
 export async function findAsignacionActiva(
   idUsuario: string,
   idObra: string,

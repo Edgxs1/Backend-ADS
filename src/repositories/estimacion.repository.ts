@@ -10,7 +10,10 @@ import type {
 } from '../schemas/estimacion.schemas.js';
 
 export const ESTADO_ESTIMACION_BORRADOR = 'Borrador';
+export const ESTADO_REVISION_SUPERVISOR = 'Revision Supervisor';
+export const ESTADO_REVISION_RESIDENTE = 'Revision Residente';
 export const ESTADO_AUTORIZADA = 'Autorizada';
+export const ESTADO_RECHAZADA = 'Rechazada';
 
 export interface Estimacion {
   id_estimacion: string;

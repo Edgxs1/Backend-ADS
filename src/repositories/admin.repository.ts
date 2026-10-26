@@ -12,6 +12,10 @@ export interface UsuarioPublico {
 
 export interface UsuarioConRol extends UsuarioPublico {
   id_rol: number;
+  rfc: string | null;
+  telefono: string | null;
+  cedula_profesional: string | null;
+  activo: boolean;
 }
 
 export interface Asignacion {
@@ -27,6 +31,10 @@ export interface UsuarioListado {
   id_usuario: string;
   correo: string;
   id_rol: number | null;
+  rfc: string | null;
+  telefono: string | null;
+  cedula_profesional: string | null;
+  activo: boolean;
 }
 
 export interface AsignacionConUsuario extends Asignacion {
@@ -102,7 +110,7 @@ export async function actualizarRolUsuario(
     .from('usuarios')
     .update({ id_rol: idRol })
     .eq('id_usuario', idUsuario)
-    .select('id_usuario, correo, id_rol')
+    .select('id_usuario, correo, id_rol, rfc, telefono, cedula_profesional, activo')
     .single();
 
   if (error || !data) {
@@ -134,7 +142,7 @@ export async function crearAsignacion(input: CrearAsignacionInput): Promise<Asig
 export async function listarUsuarios(): Promise<UsuarioListado[]> {
   const { data, error } = await supabaseAdmin
     .from('usuarios')
-    .select('id_usuario, correo, id_rol')
+    .select('id_usuario, correo, id_rol, rfc, telefono, cedula_profesional, activo')
     .order('correo', { ascending: true });
 
   if (error) {

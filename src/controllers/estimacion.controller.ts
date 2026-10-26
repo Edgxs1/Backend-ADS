@@ -7,6 +7,7 @@ import {
   autorizarEstimacion,
   corregirEstatusEstimacion,
   eliminarEstimacion,
+  enviarAResidente,
   enviarEstimacion,
   listarEstimacionesPorObra,
   obtenerCaratulaOficial,
@@ -54,6 +55,23 @@ export async function listar(req: Request, res: Response, next: NextFunction): P
 export async function enviar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const estimacion = await enviarEstimacion(
+      requerirParam(req, 'id_obra'),
+      requerirParam(req, 'id_estimacion'),
+    );
+
+    res.status(200).json({ success: true, data: estimacion });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function enviarResidente(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const estimacion = await enviarAResidente(
       requerirParam(req, 'id_obra'),
       requerirParam(req, 'id_estimacion'),
     );

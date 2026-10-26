@@ -11,7 +11,6 @@ import { roleMiddleware } from '../middlewares/role.middleware.js';
 import { validateBody, validateParams } from '../middlewares/validate.middleware.js';
 import {
   bitacoraObraParamsSchema,
-  cambiarEstadoNotaSchema,
   crearNotaSchema,
   editarNotaSchema,
   notaParamsSchema,
@@ -26,6 +25,8 @@ const ROLES_OPERATIVOS = [
   'Residente',
   'Directivo',
 ] as const;
+
+const ROLES_FIRMANTES = ['Superintendente', 'Supervisor', 'Residente'] as const;
 
 bitacoraRouter.post(
   '/:id_obra/bitacora',
@@ -65,7 +66,14 @@ bitacoraRouter.patch(
   '/:id_obra/bitacora/:id_nota/estado',
   authMiddleware,
   validateParams(notaParamsSchema),
-  roleMiddleware('Residente', { scope: 'obra' }),
-  validateBody(cambiarEstadoNotaSchema),
+  roleMiddleware(...ROLES_FIRMANTES, { scope: 'obra' }),
+  cambiarEstado,
+);
+
+bitacoraRouter.patch(
+  '/:id_obra/bitacora/:id_nota/firmar',
+  authMiddleware,
+  validateParams(notaParamsSchema),
+  roleMiddleware(...ROLES_FIRMANTES, { scope: 'obra' }),
   cambiarEstado,
 );

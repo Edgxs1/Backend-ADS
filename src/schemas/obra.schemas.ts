@@ -10,4 +10,9 @@ export const obraIdParamsSchema = z.object({
   id: z.uuid(),
 });
 
+export const obraUsuarioParamsSchema = z.object({
+  id_obra: z.uuid(),
+  id_usuario: z.uuid(),
+});
+
 export type CrearObraDto = z.infer<typeof crearObraSchema>;

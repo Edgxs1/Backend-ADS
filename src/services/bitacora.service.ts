@@ -1,12 +1,12 @@
 import {
-  actualizarEstadoNota as actualizarEstadoRepo,
+  ESTADO_ABIERTA,
+  ESTADO_FIRMADA,
+  firmarNotaRepo,
+  obtenerNotaPorId,
+  obtenerNotasPorObra as obtenerNotasRepo,
   actualizarTextoNota as actualizarTextoRepo,
   crearNota as crearNotaRepo,
   eliminarNota as eliminarNotaRepo,
-  ESTADO_ABIERTA,
-  ESTADO_FIRMADA,
-  obtenerNotaPorId,
-  obtenerNotasPorObra as obtenerNotasRepo,
 } from '../repositories/bitacora.repository.js';
 import type {
   NotaBitacora,
@@ -16,13 +16,13 @@ import { findUsuarioPorId } from '../repositories/usuarios.repository.js';
 import { AppError } from '../shared/errors/AppError.js';
 import { ROL_BY_ID } from '../shared/types/roles.js';
 import type { Rol } from '../shared/types/roles.js';
-import type {
-  CambiarEstadoNotaDto,
-  CrearNotaDto,
-  EditarNotaDto,
-} from '../schemas/bitacora.schemas.js';
+import type { CrearNotaDto, EditarNotaDto } from '../schemas/bitacora.schemas.js';
+import { generarFirmaBitacora } from '../shared/crypto/firma-bitacora.js';
 
-async function obtenerRolActuante(idUsuario: string): Promise<Rol> {
+async function obtenerUsuarioYRol(idUsuario: string): Promise<{
+  rol: Rol;
+  rfc: string | null;
+}> {
   const usuario = await findUsuarioPorId(idUsuario);
   const rol = usuario ? ROL_BY_ID[usuario.id_rol] : undefined;
 
@@ -30,14 +30,29 @@ async function obtenerRolActuante(idUsuario: string): Promise<Rol> {
     throw new AppError(403, 'Acceso denegado: no se pudo determinar tu rol');
   }
 
-  return rol;
+  return { rol, rfc: usuario?.rfc ?? null };
+}
+
+function obtenerColumnaFirmaPorRol(
+  rol: Rol,
+): 'firma_superintendente' | 'firma_supervisor' | 'firma_residente' | null {
+  if (rol === 'Superintendente') return 'firma_superintendente';
+  if (rol === 'Supervisor') return 'firma_supervisor';
+  if (rol === 'Residente') return 'firma_residente';
+  return null;
 }
 
 /**
- * Candado de Inmutabilidad Legal.
- * Una vez que una nota está "Firmada", no puede editarse ni eliminarse.
+ * RF5.4 - Candado de edición/eliminación.
+ * El creador original solo puede editar/eliminar su nota SI Y SOLO SI
+ * las tres columnas de firmas están nulas (nadie ha firmado aún).
+ * Si ya hay al menos una firma, se bloquea la edición (403).
  */
-async function asegurarNotaEditable(idNota: string): Promise<NotaBitacora> {
+async function asegurarEditablePorFirmas(
+  idNota: string,
+  idUsuario: string,
+  rol: Rol,
+): Promise<NotaBitacora> {
   const nota = await obtenerNotaPorId(idNota);
 
   if (!nota) {
@@ -51,12 +66,21 @@ async function asegurarNotaEditable(idNota: string): Promise<NotaBitacora> {
     );
   }
 
-  return nota;
-}
+  const tieneAlgunaFirma = Boolean(
+    nota.firma_superintendente ||
+      nota.firma_supervisor ||
+      nota.firma_residente,
+  );
 
-function verificarPropiedadOAmin(nota: NotaBitacora, idUsuario: string, rol: Rol): void {
+  if (tieneAlgunaFirma) {
+    throw new AppError(
+      403,
+      'No se puede editar o eliminar: ya existe al menos una firma en la nota',
+    );
+  }
+
   if (rol === 'Administrador') {
-    return;
+    return nota;
   }
 
   if (nota.id_creador !== idUsuario) {
@@ -65,6 +89,8 @@ function verificarPropiedadOAmin(nota: NotaBitacora, idUsuario: string, rol: Rol
       'Acceso denegado: solo el creador de la nota o un Administrador pueden modificarla',
     );
   }
+
+  return nota;
 }
 
 export async function registrarNota(
@@ -90,43 +116,58 @@ export async function editarNota(
   idUsuario: string,
   input: EditarNotaDto,
 ): Promise<NotaBitacora> {
-  const nota = await asegurarNotaEditable(idNota);
-  const rol = await obtenerRolActuante(idUsuario);
-
-  verificarPropiedadOAmin(nota, idUsuario, rol);
-
+  const { rol } = await obtenerUsuarioYRol(idUsuario);
+  await asegurarEditablePorFirmas(idNota, idUsuario, rol);
   return actualizarTextoRepo(idNota, input.texto);
 }
 
 export async function eliminarNota(idNota: string, idUsuario: string): Promise<void> {
-  const nota = await asegurarNotaEditable(idNota);
-  const rol = await obtenerRolActuante(idUsuario);
-
-  verificarPropiedadOAmin(nota, idUsuario, rol);
-
+  const { rol } = await obtenerUsuarioYRol(idUsuario);
+  await asegurarEditablePorFirmas(idNota, idUsuario, rol);
   await eliminarNotaRepo(idNota);
 }
 
-export async function firmarNota(
-  idNota: string,
-  idUsuario: string,
-  input: CambiarEstadoNotaDto,
-): Promise<NotaBitacora> {
-  const rol = await obtenerRolActuante(idUsuario);
+export async function firmarNota(idNota: string, idUsuario: string): Promise<NotaBitacora> {
+  const { rol, rfc } = await obtenerUsuarioYRol(idUsuario);
+  const columnaFirma = obtenerColumnaFirmaPorRol(rol);
 
-  if (rol !== 'Residente') {
-    throw new AppError(403, 'Acceso denegado: solo un Residente puede firmar notas');
+  if (!columnaFirma) {
+    throw new AppError(
+      403,
+      'Acceso denegado: solo Superintendente, Supervisor o Residente pueden firmar notas',
+    );
   }
 
-  if (input.estado !== ESTADO_FIRMADA) {
-    throw new AppError(403, 'Un Residente solo puede firmar la nota (Abierta → Firmada)');
+  if (!rfc || rfc.trim().length === 0) {
+    throw new AppError(403, 'No es posible firmar: el RFC del usuario no está registrado');
   }
 
-  const nota = await asegurarNotaEditable(idNota);
+  const nota = await obtenerNotaPorId(idNota);
 
-  if (nota.estado !== ESTADO_ABIERTA) {
-    throw new AppError(403, 'Solo se pueden firmar notas en estado "Abierta"');
+  if (!nota) {
+    throw new AppError(404, 'Nota de bitácora no encontrada');
   }
 
-  return actualizarEstadoRepo(idNota, ESTADO_FIRMADA);
+  if (nota.estado === ESTADO_FIRMADA) {
+    throw new AppError(403, 'Nota inmutable: la nota ya se encuentra firmada');
+  }
+
+  if (nota[columnaFirma]) {
+    throw new AppError(403, 'Ya existe una firma con este rol para la nota');
+  }
+
+  const hash = generarFirmaBitacora({ idNota, rfc });
+
+  const notaTrasFirma = await firmarNotaRepo(idNota, columnaFirma, hash, nota.estado);
+
+  const tieneLasTresFirmas =
+    Boolean(notaTrasFirma.firma_superintendente) &&
+    Boolean(notaTrasFirma.firma_supervisor) &&
+    Boolean(notaTrasFirma.firma_residente);
+
+  if (tieneLasTresFirmas && notaTrasFirma.estado !== ESTADO_FIRMADA) {
+    return firmarNotaRepo(idNota, columnaFirma, hash, ESTADO_FIRMADA);
+  }
+
+  return notaTrasFirma;
 }

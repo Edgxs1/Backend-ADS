@@ -30,7 +30,8 @@ import type {
 } from '../schemas/estimacion.schemas.js';
 
 const ESTADO_BORRADOR: EstadoEstimacion = 'Borrador';
-const ESTADO_EN_REVISION: EstadoEstimacion = 'En revisión';
+const ESTADO_REVISION_SUPERVISOR: EstadoEstimacion = 'Revision Supervisor';
+const ESTADO_REVISION_RESIDENTE: EstadoEstimacion = 'Revision Residente';
 const ESTADO_AUTORIZADA: EstadoEstimacion = 'Autorizada';
 const ESTADO_RECHAZADA: EstadoEstimacion = 'Rechazada';
 
@@ -305,7 +306,17 @@ export async function enviarEstimacion(
 ): Promise<Estimacion> {
   return transitarEstado(idObra, idEstimacion, {
     desde: ESTADO_BORRADOR,
-    hacia: ESTADO_EN_REVISION,
+    hacia: ESTADO_REVISION_SUPERVISOR,
+  });
+}
+
+export async function enviarAResidente(
+  idObra: string,
+  idEstimacion: string,
+): Promise<Estimacion> {
+  return transitarEstado(idObra, idEstimacion, {
+    desde: ESTADO_REVISION_SUPERVISOR,
+    hacia: ESTADO_REVISION_RESIDENTE,
   });
 }
 
@@ -319,10 +330,10 @@ export async function autorizarEstimacion(
     throw new AppError(404, 'Estimación no encontrada en esta obra');
   }
 
-  if (estimacion.estado !== ESTADO_EN_REVISION) {
+  if (estimacion.estado !== ESTADO_REVISION_RESIDENTE) {
     throw new AppError(
       409,
-      `Transición inválida: se esperaba estado "${ESTADO_EN_REVISION}" pero la estimación está en "${estimacion.estado}"`,
+      `Transición inválida: se esperaba estado "${ESTADO_REVISION_RESIDENTE}" pero la estimación está en "${estimacion.estado}"`,
     );
   }
 
@@ -341,7 +352,7 @@ export async function rechazarEstimacion(
   idEstimacion: string,
 ): Promise<Estimacion> {
   return transitarEstado(idObra, idEstimacion, {
-    desde: ESTADO_EN_REVISION,
+    desde: ESTADO_REVISION_RESIDENTE,
     hacia: ESTADO_RECHAZADA,
   });
 }

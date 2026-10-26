@@ -1,5 +1,6 @@
 import { env } from '../config/env.js';
 import { createAnonClient, supabaseAdmin } from '../config/supabase.js';
+import { findUsuarioPorId } from '../repositories/usuarios.repository.js';
 import { AppError } from '../shared/errors/AppError.js';
 
 export interface SesionAutenticada {
@@ -22,6 +23,16 @@ export async function iniciarSesion(
   }
 
   const { session } = data;
+
+  const usuario = await findUsuarioPorId(session.user.id);
+
+  if (usuario && usuario.activo === false) {
+    throw new AppError(
+      403,
+      'Cuenta desactivada temporalmente. Contacte al administrador',
+      { code: 'CUENTA_DESACTIVADA' },
+    );
+  }
 
   return {
     access_token: session.access_token,

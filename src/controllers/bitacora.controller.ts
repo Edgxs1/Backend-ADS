@@ -1,6 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
 import type {
-  CambiarEstadoNotaDto,
   CrearNotaDto,
   EditarNotaDto,
 } from '../schemas/bitacora.schemas.js';
@@ -92,11 +91,7 @@ export async function cambiarEstado(
     const idNota = requerirParam(req, 'id_nota');
     const idUsuario = requerirUsuario(req);
 
-    const nota = await firmarNota(
-      idNota,
-      idUsuario,
-      req.body as CambiarEstadoNotaDto,
-    );
+    const nota = await firmarNota(idNota, idUsuario);
 
     res.status(200).json({ success: true, data: nota });
   } catch (error) {

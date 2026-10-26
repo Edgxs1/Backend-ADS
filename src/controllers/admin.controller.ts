@@ -5,6 +5,7 @@ import type {
   CrearUsuarioDto,
 } from '../schemas/admin.schemas.js';
 import {
+  actualizarEstadoUsuario as actualizarEstadoUsuarioService,
   actualizarRolUsuario as actualizarRolUsuarioService,
   asignarUsuario as asignarUsuarioService,
   crearUsuario as crearUsuarioService,
@@ -80,6 +81,27 @@ export async function actualizarRol(
       idUsuario,
       req.body as ActualizarRolDto,
     );
+    res.status(200).json({ success: true, data: usuario });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function actualizarEstado(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id_usuario: idUsuario } = req.params;
+
+    if (!idUsuario || Array.isArray(idUsuario)) {
+      throw new AppError(400, 'Parámetro id_usuario inválido');
+    }
+
+    const { activo } = req.body as { activo: boolean };
+    const usuario = await actualizarEstadoUsuarioService(idUsuario, activo);
+
     res.status(200).json({ success: true, data: usuario });
   } catch (error) {
     next(error);
