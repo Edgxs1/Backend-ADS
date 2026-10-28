@@ -9,7 +9,6 @@
     "moduleResolution": "nodenext",
     "target": "esnext",
     "lib": ["esnext"],
-    "types": ["node"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
 
