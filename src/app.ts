@@ -18,14 +18,14 @@ import { estimacionRouter } from './routes/estimacion.routes.js';
 
 const app = express();
 
-// Middlewares globales
-app.use(cors({ origin: env.FRONTEND_URL }));
-app.use(express.json());
-
 // Ruta de prueba (Health Check)
 app.get('/api/v1/health', (_req, res) => {
   res.status(200).json({ success: true, data: { message: 'API OK' } });
 });
+
+// Middlewares globales
+app.use(cors({ origin: env.FRONTEND_URL }));
+app.use(express.json());
 
 // Rutas de los módulos
 app.use('/api/v1/auth', authRouter);
