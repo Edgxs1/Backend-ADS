@@ -1,4 +1,4 @@
-import './augment-express.js';
+import type {} from './augment-express';
 
 import express from 'express';
 import cors from 'cors';
