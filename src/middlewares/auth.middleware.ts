@@ -43,8 +43,9 @@ export async function authMiddleware(
 
     req.user = {
       id: data.user.id,
-      email: data.user.email ?? null,
-    };
+      email: data.user.email ?? '',
+      rol: usuario ? undefined : undefined,
+    } as any;
 
     next();
   } catch (error) {

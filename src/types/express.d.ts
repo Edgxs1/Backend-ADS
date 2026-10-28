@@ -7,7 +7,7 @@ declare global {
         id: string;
         id_usuario?: string;
         email: string;
-        rol: string;
+        rol?: string;
         rfc?: string;
         activo?: boolean;
         [key: string]: any;
