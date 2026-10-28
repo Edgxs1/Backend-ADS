@@ -1,4 +1,4 @@
-import type {} from './augment-express';
+/// <reference path="./augment-express.d.ts" />
 
 import express from 'express';
 import cors from 'cors';
