@@ -1,8 +1,10 @@
 import {
   actualizarEstadoReporte as actualizarEstadoRepo,
+  actualizarReporte as actualizarReporteRepo,
   crearReporte as crearReporteRepo,
   obtenerReportePorId,
   obtenerReportesPorObra as obtenerReportesRepo,
+  ESTADO_POR_REVISAR,
   ESTADO_VALIDADO,
 } from '../repositories/reporte.repository.js';
 import type { Reporte, ReporteConCreador } from '../repositories/reporte.repository.js';
@@ -34,8 +36,67 @@ export async function registrarReporte(
   return crearReporteRepo({
     id_obra: idObra,
     id_creador: idCreador,
-    condicionantes: input.condicionantes,
+    actividades_realizadas: input.actividades_realizadas ?? null,
+    notas_relevantes: input.notas_relevantes ?? null,
+    hora_lluvia: input.hora_lluvia ?? null,
+    estado_tiempo: input.estado_tiempo ?? null,
+    senalamiento_preventivo: input.senalamiento_preventivo ?? null,
+    equipo_proteccion: input.equipo_proteccion ?? null,
+    suministro_materiales: input.suministro_materiales ?? null,
+    estado_personal: input.estado_personal ?? null,
+    estado_maquinaria: input.estado_maquinaria ?? null,
+    estado_equipo: input.estado_equipo ?? null,
     avance_general: input.avance_general,
+    fecha_estimada_conclusion: input.fecha_estimada_conclusion,
+    condicionantes: input.condicionantes ?? [],
+    problematica: input.problematica ?? [],
+    interferencias: input.interferencias ?? [],
+    conceptos_relevantes: input.conceptos_relevantes ?? [],
+    recursos_utilizados: input.recursos_utilizados ?? [],
+  });
+}
+
+export async function actualizarReporte(
+  idObra: string,
+  idReporte: string,
+  idUsuario: string,
+  input: CrearReporteDto,
+): Promise<Reporte> {
+  const rol = await obtenerRolActuante(idUsuario);
+
+  if (rol !== 'Supervisor') {
+    throw new AppError(403, 'Solo el rol Supervisor puede actualizar el reporte diario');
+  }
+
+  const reporte = await obtenerReportePorId(idReporte);
+
+  if (!reporte || reporte.id_obra !== idObra) {
+    throw new AppError(404, 'Reporte no encontrado en esta obra');
+  }
+
+  if (reporte.estado === ESTADO_VALIDADO) {
+    throw new AppError(409, 'No se puede actualizar un reporte ya validado');
+  }
+
+  return actualizarReporteRepo(idReporte, {
+    actividades_realizadas: input.actividades_realizadas ?? null,
+    notas_relevantes: input.notas_relevantes ?? null,
+    hora_lluvia: input.hora_lluvia ?? null,
+    estado_tiempo: input.estado_tiempo ?? null,
+    senalamiento_preventivo: input.senalamiento_preventivo ?? null,
+    equipo_proteccion: input.equipo_proteccion ?? null,
+    suministro_materiales: input.suministro_materiales ?? null,
+    estado_personal: input.estado_personal ?? null,
+    estado_maquinaria: input.estado_maquinaria ?? null,
+    estado_equipo: input.estado_equipo ?? null,
+    avance_general: input.avance_general,
+    fecha_estimada_conclusion: input.fecha_estimada_conclusion,
+    condicionantes: input.condicionantes ?? [],
+    problematica: input.problematica ?? [],
+    interferencias: input.interferencias ?? [],
+    conceptos_relevantes: input.conceptos_relevantes ?? [],
+    recursos_utilizados: input.recursos_utilizados ?? [],
+    estado: ESTADO_POR_REVISAR,
   });
 }
 

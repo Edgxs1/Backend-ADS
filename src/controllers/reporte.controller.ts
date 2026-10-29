@@ -4,6 +4,7 @@ import type {
   CrearReporteDto,
 } from '../schemas/reporte.schemas.js';
 import {
+  actualizarReporte,
   cambiarEstadoReporte,
   listarReportesPorObra,
   registrarReporte,
@@ -39,6 +40,25 @@ export async function crear(req: Request, res: Response, next: NextFunction): Pr
     const reporte = await registrarReporte(idObra, idCreador, req.body as CrearReporteDto);
 
     res.status(201).json({ success: true, data: reporte });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function actualizar(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const idObra = requerirParam(req, 'id_obra');
+    const idReporte = requerirParam(req, 'id_reporte');
+    const idUsuario = requerirUsuario(req);
+
+    const reporte = await actualizarReporte(
+      idObra,
+      idReporte,
+      idUsuario,
+      req.body as CrearReporteDto,
+    );
+
+    res.status(200).json({ success: true, data: reporte });
   } catch (error) {
     next(error);
   }

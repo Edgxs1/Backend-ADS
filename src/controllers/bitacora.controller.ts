@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import type {
   CrearNotaDto,
   EditarNotaDto,
+  FirmarNotaDto,
 } from '../schemas/bitacora.schemas.js';
 import {
   editarNota,
@@ -9,7 +10,9 @@ import {
   firmarNota,
   listarNotasPorObra,
   registrarNota,
+  sellarNota,
 } from '../services/bitacora.service.js';
+import { obtenerNotaPorId } from '../repositories/bitacora.repository.js';
 import { AppError } from '../shared/errors/AppError.js';
 
 function requerirParam(req: Request, nombre: string): string {
@@ -61,6 +64,24 @@ export async function editar(req: Request, res: Response, next: NextFunction): P
     const idNota = requerirParam(req, 'id_nota');
     const idUsuario = requerirUsuario(req);
 
+    const notaActual = await obtenerNotaPorId(idNota);
+
+    if (!notaActual) {
+      throw new AppError(404, 'Nota de bitácora no encontrada');
+    }
+
+    if (notaActual.id_creador !== idUsuario) {
+      throw new AppError(403, 'Solo el creador puede editar esta nota');
+    }
+
+    if (
+      notaActual.firma_superintendente ||
+      notaActual.firma_supervisor ||
+      notaActual.firma_residente
+    ) {
+      throw new AppError(403, 'La nota ya contiene firmas y no puede ser modificada');
+    }
+
     const nota = await editarNota(idNota, idUsuario, req.body as EditarNotaDto);
 
     res.status(200).json({ success: true, data: nota });
@@ -92,6 +113,20 @@ export async function cambiarEstado(
     const idUsuario = requerirUsuario(req);
 
     const nota = await firmarNota(idNota, idUsuario);
+
+    res.status(200).json({ success: true, data: nota });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function firmar(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const idNota = requerirParam(req, 'id');
+    const idUsuario = requerirUsuario(req);
+    const { password } = req.body as FirmarNotaDto;
+
+    const nota = await sellarNota(idNota, idUsuario, password);
 
     res.status(200).json({ success: true, data: nota });
   } catch (error) {

@@ -37,7 +37,7 @@ export async function iniciarSesion(
   return {
     access_token: session.access_token,
     refresh_token: session.refresh_token,
-    expires_in: session.expires_in,
+    expires_in: 30 * 60,
     token_type: session.token_type,
     user: { id: session.user.id, email: session.user.email ?? null },
   };

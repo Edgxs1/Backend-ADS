@@ -165,6 +165,29 @@ export async function actualizarEstadoNota(
   return data as NotaBitacora;
 }
 
+export async function inyectarFirmaNota(
+  idNota: string,
+  columnaFirma: 'firma_superintendente' | 'firma_supervisor' | 'firma_residente',
+  firma: string,
+): Promise<NotaBitacora> {
+  const updates: Record<string, string> = {
+    [columnaFirma]: firma,
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from('bitacora_notas')
+    .update(updates)
+    .eq('id_nota', idNota)
+    .select(COLUMNS)
+    .single();
+
+  if (error || !data) {
+    throw new AppError(500, 'No se pudo registrar la firma de la nota');
+  }
+
+  return data as NotaBitacora;
+}
+
 export async function eliminarNota(idNota: string): Promise<void> {
   const { error } = await supabaseAdmin
     .from('bitacora_notas')

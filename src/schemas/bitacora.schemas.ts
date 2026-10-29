@@ -23,7 +23,12 @@ export const notaParamsSchema = z.object({
   id_nota: z.uuid(),
 });
 
+export const firmarNotaSchema = z.object({
+  password: z.string().min(1, 'La contraseña es obligatoria'),
+});
+
 export type CrearNotaDto = z.infer<typeof crearNotaSchema>;
 export type EditarNotaDto = z.infer<typeof editarNotaSchema>;
 export type CambiarEstadoNotaDto = z.infer<typeof cambiarEstadoNotaSchema>;
+export type FirmarNotaDto = z.infer<typeof firmarNotaSchema>;
 export type EstadoNota = (typeof ESTADOS_NOTA)[number];

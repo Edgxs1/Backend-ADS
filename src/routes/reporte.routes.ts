@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  actualizar,
   actualizarEstado,
   crear,
   listar,
@@ -38,6 +39,15 @@ reporteRouter.post(
   roleMiddleware('Supervisor', { scope: 'obra' }),
   validateBody(crearReporteSchema),
   crear,
+);
+
+reporteRouter.put(
+  '/:id_obra/reportes/:id_reporte',
+  authMiddleware,
+  validateParams(reporteParamsSchema),
+  roleMiddleware('Supervisor', { scope: 'obra' }),
+  validateBody(crearReporteSchema),
+  actualizar,
 );
 
 reporteRouter.get(

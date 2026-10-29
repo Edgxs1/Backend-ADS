@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   ESTADO_ABIERTA,
   ESTADO_FIRMADA,
@@ -7,6 +8,8 @@ import {
   actualizarTextoNota as actualizarTextoRepo,
   crearNota as crearNotaRepo,
   eliminarNota as eliminarNotaRepo,
+  inyectarFirmaNota,
+  actualizarEstadoNota,
 } from '../repositories/bitacora.repository.js';
 import type {
   NotaBitacora,
@@ -18,6 +21,8 @@ import { ROL_BY_ID } from '../shared/types/roles.js';
 import type { Rol } from '../shared/types/roles.js';
 import type { CrearNotaDto, EditarNotaDto } from '../schemas/bitacora.schemas.js';
 import { generarFirmaBitacora } from '../shared/crypto/firma-bitacora.js';
+import { env } from '../config/env.js';
+import { supabaseAdmin } from '../config/supabase.js';
 
 async function obtenerUsuarioYRol(idUsuario: string): Promise<{
   rol: Rol;
@@ -158,16 +163,78 @@ export async function firmarNota(idNota: string, idUsuario: string): Promise<Not
 
   const hash = generarFirmaBitacora({ idNota, rfc });
 
-  const notaTrasFirma = await firmarNotaRepo(idNota, columnaFirma, hash, nota.estado);
+  const notaFirmada = await firmarNotaRepo(idNota, columnaFirma, hash, nota.estado);
 
-  const tieneLasTresFirmas =
-    Boolean(notaTrasFirma.firma_superintendente) &&
-    Boolean(notaTrasFirma.firma_supervisor) &&
-    Boolean(notaTrasFirma.firma_residente);
-
-  if (tieneLasTresFirmas && notaTrasFirma.estado !== ESTADO_FIRMADA) {
+  if (
+    notaFirmada.firma_superintendente &&
+    notaFirmada.firma_supervisor &&
+    notaFirmada.firma_residente &&
+    notaFirmada.estado !== ESTADO_FIRMADA
+  ) {
     return firmarNotaRepo(idNota, columnaFirma, hash, ESTADO_FIRMADA);
   }
 
-  return notaTrasFirma;
+  return notaFirmada;
+}
+
+export async function sellarNota(
+  idNota: string,
+  idUsuario: string,
+  password: string,
+): Promise<NotaBitacora> {
+  const { rol, rfc } = await obtenerUsuarioYRol(idUsuario);
+  const columnaFirma = obtenerColumnaFirmaPorRol(rol);
+
+  if (!columnaFirma) {
+    throw new AppError(
+      403,
+      'Acceso denegado: solo Superintendente, Supervisor o Residente pueden firmar notas',
+    );
+  }
+
+  if (!rfc || rfc.trim().length === 0) {
+    throw new AppError(403, 'No es posible firmar: el RFC del usuario no está registrado');
+  }
+
+  const usuario = await findUsuarioPorId(idUsuario);
+  if (!usuario) {
+    throw new AppError(401, 'No autorizado');
+  }
+
+  const { error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+    email: usuario.correo,
+    password,
+  });
+
+  if (signInError) {
+    throw new AppError(401, 'Unauthorized');
+  }
+
+  const nota = await obtenerNotaPorId(idNota);
+
+  if (!nota) {
+    throw new AppError(404, 'Nota de bitácora no encontrada');
+  }
+
+  if (nota.estado === ESTADO_FIRMADA) {
+    throw new AppError(403, 'Nota inmutable: la nota ya se encuentra firmada');
+  }
+
+  if (nota[columnaFirma]) {
+    throw new AppError(403, 'Ya existe una firma con este rol para la nota');
+  }
+
+  const fechaHoraActual = new Date().toISOString();
+  const hash = createHash('sha256')
+    .update(`${rfc.trim().toUpperCase()}${idNota}${fechaHoraActual}${env.FIRMA_SALT}`)
+    .digest('hex');
+
+  const notaFirmada = await inyectarFirmaNota(idNota, columnaFirma, hash);
+
+  if (notaFirmada.firma_superintendente && notaFirmada.firma_supervisor && notaFirmada.firma_residente) {
+    await actualizarEstadoNota(idNota, ESTADO_FIRMADA);
+    return { ...notaFirmada, estado: ESTADO_FIRMADA };
+  }
+
+  return notaFirmada;
 }

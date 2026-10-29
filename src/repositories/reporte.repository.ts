@@ -9,9 +9,24 @@ export interface Reporte {
   id_obra: string;
   id_creador: string;
   estado: string;
-  condicionantes: string;
-  avance_general: string;
   created_at: string;
+  condicionantes: string[] | null;
+  problematica: string[] | null;
+  interferencias: string[] | null;
+  conceptos_relevantes: string[] | null;
+  recursos_utilizados: string[] | null;
+  actividades_realizadas: string | null;
+  notas_relevantes: string | null;
+  estado_tiempo: string | null;
+  hora_lluvia: string | null;
+  senalamiento_preventivo: string | null;
+  equipo_proteccion: string | null;
+  suministro_materiales: string | null;
+  estado_personal: string | null;
+  estado_maquinaria: string | null;
+  estado_equipo: string | null;
+  avance_general: number | null;
+  fecha_estimada_conclusion: string | null;
 }
 
 export interface ReporteConCreador extends Reporte {
@@ -21,8 +36,23 @@ export interface ReporteConCreador extends Reporte {
 export interface CrearReporteInput {
   id_obra: string;
   id_creador: string;
-  condicionantes: string;
-  avance_general: string;
+  actividades_realizadas?: string | null;
+  notas_relevantes?: string | null;
+  hora_lluvia?: string | null;
+  estado_tiempo?: string | null;
+  senalamiento_preventivo?: string | null;
+  equipo_proteccion?: string | null;
+  suministro_materiales?: string | null;
+  estado_personal?: string | null;
+  estado_maquinaria?: string | null;
+  estado_equipo?: string | null;
+  avance_general: number;
+  fecha_estimada_conclusion: string;
+  condicionantes: string[];
+  problematica: string[];
+  interferencias: string[];
+  conceptos_relevantes: string[];
+  recursos_utilizados: string[];
 }
 
 interface ReporteRow extends Reporte {
@@ -44,7 +74,7 @@ function extraerCorreo(
 }
 
 const COLUMNS =
-  'id_reporte, id_obra, id_creador, estado, condicionantes, avance_general, created_at';
+  'id_reporte, id_obra, id_creador, estado, created_at, condicionantes, problematica, interferencias, conceptos_relevantes, recursos_utilizados, actividades_realizadas, notas_relevantes, estado_tiempo, hora_lluvia, senalamiento_preventivo, equipo_proteccion, suministro_materiales, estado_personal, estado_maquinaria, estado_equipo, avance_general, fecha_estimada_conclusion';
 
 export async function crearReporte(input: CrearReporteInput): Promise<Reporte> {
   const { data, error } = await supabaseAdmin
@@ -52,8 +82,23 @@ export async function crearReporte(input: CrearReporteInput): Promise<Reporte> {
     .insert({
       id_obra: input.id_obra,
       id_creador: input.id_creador,
-      condicionantes: input.condicionantes,
+      actividades_realizadas: input.actividades_realizadas ?? null,
+      notas_relevantes: input.notas_relevantes ?? null,
+      hora_lluvia: input.hora_lluvia ?? null,
+      estado_tiempo: input.estado_tiempo ?? null,
+      senalamiento_preventivo: input.senalamiento_preventivo ?? null,
+      equipo_proteccion: input.equipo_proteccion ?? null,
+      suministro_materiales: input.suministro_materiales ?? null,
+      estado_personal: input.estado_personal ?? null,
+      estado_maquinaria: input.estado_maquinaria ?? null,
+      estado_equipo: input.estado_equipo ?? null,
       avance_general: input.avance_general,
+      fecha_estimada_conclusion: input.fecha_estimada_conclusion,
+      condicionantes: input.condicionantes,
+      problematica: input.problematica,
+      interferencias: input.interferencias,
+      conceptos_relevantes: input.conceptos_relevantes,
+      recursos_utilizados: input.recursos_utilizados,
       estado: ESTADO_POR_REVISAR,
     })
     .select(COLUMNS)
@@ -97,6 +142,64 @@ export async function obtenerReportePorId(idReporte: string): Promise<Reporte | 
   }
 
   return (data as Reporte | null) ?? null;
+}
+
+export interface ActualizarReporteInput {
+  actividades_realizadas?: string | null;
+  notas_relevantes?: string | null;
+  hora_lluvia?: string | null;
+  estado_tiempo?: string | null;
+  senalamiento_preventivo?: string | null;
+  equipo_proteccion?: string | null;
+  suministro_materiales?: string | null;
+  estado_personal?: string | null;
+  estado_maquinaria?: string | null;
+  estado_equipo?: string | null;
+  avance_general: number;
+  fecha_estimada_conclusion: string;
+  condicionantes: string[];
+  problematica: string[];
+  interferencias: string[];
+  conceptos_relevantes: string[];
+  recursos_utilizados: string[];
+  estado?: string;
+}
+
+export async function actualizarReporte(
+  idReporte: string,
+  input: ActualizarReporteInput,
+): Promise<Reporte> {
+  const { data, error } = await supabaseAdmin
+    .from('reportes_diarios')
+    .update({
+      actividades_realizadas: input.actividades_realizadas ?? null,
+      notas_relevantes: input.notas_relevantes ?? null,
+      hora_lluvia: input.hora_lluvia ?? null,
+      estado_tiempo: input.estado_tiempo ?? null,
+      senalamiento_preventivo: input.senalamiento_preventivo ?? null,
+      equipo_proteccion: input.equipo_proteccion ?? null,
+      suministro_materiales: input.suministro_materiales ?? null,
+      estado_personal: input.estado_personal ?? null,
+      estado_maquinaria: input.estado_maquinaria ?? null,
+      estado_equipo: input.estado_equipo ?? null,
+      avance_general: input.avance_general,
+      fecha_estimada_conclusion: input.fecha_estimada_conclusion,
+      condicionantes: input.condicionantes,
+      problematica: input.problematica,
+      interferencias: input.interferencias,
+      conceptos_relevantes: input.conceptos_relevantes,
+      recursos_utilizados: input.recursos_utilizados,
+      ...(input.estado ? { estado: input.estado } : {}),
+    })
+    .eq('id_reporte', idReporte)
+    .select(COLUMNS)
+    .single();
+
+  if (error || !data) {
+    throw new AppError(404, 'No se encontró el reporte para actualizar');
+  }
+
+  return data as Reporte;
 }
 
 export async function actualizarEstadoReporte(

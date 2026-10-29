@@ -4,6 +4,7 @@ import {
   crear,
   editar,
   eliminar,
+  firmar,
   listar,
 } from '../controllers/bitacora.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
@@ -13,6 +14,7 @@ import {
   bitacoraObraParamsSchema,
   crearNotaSchema,
   editarNotaSchema,
+  firmarNotaSchema,
   notaParamsSchema,
 } from '../schemas/bitacora.schemas.js';
 
@@ -76,4 +78,12 @@ bitacoraRouter.patch(
   validateParams(notaParamsSchema),
   roleMiddleware(...ROLES_FIRMANTES, { scope: 'obra' }),
   cambiarEstado,
+);
+
+bitacoraRouter.post(
+  '/bitacora/:id/firmar',
+  authMiddleware,
+  roleMiddleware(...ROLES_FIRMANTES),
+  validateBody(firmarNotaSchema),
+  firmar,
 );
