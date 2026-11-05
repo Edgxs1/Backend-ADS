@@ -13,8 +13,11 @@ import { archivoRouter } from './routes/archivo.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
 import { usuariosRouter } from './routes/usuarios.routes.js';
 import { reporteRouter } from './routes/reporte.routes.js';
-import { bitacoraRouter } from './routes/bitacora.routes.js';
-import { estimacionRouter } from './routes/estimacion.routes.js';
+import { bitacoraNotaRouter, bitacoraRouter } from './routes/bitacora.routes.js';
+import {
+  estimacionDirectaRouter,
+  estimacionRouter,
+} from './routes/estimacion.routes.js';
 
 const app = express();
 
@@ -27,6 +30,17 @@ app.get('/api/v1/health', (_req, res) => {
 app.use(cors({ origin: env.FRONTEND_URL }));
 app.use(express.json());
 
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(
+      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`,
+    );
+  });
+  next();
+});
+
 // Rutas de los módulos
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/usuarios', usuariosRouter);
@@ -36,7 +50,10 @@ app.use('/api/v1/obras', catalogoRouter);
 app.use('/api/v1/obras', partidaRouter);
 app.use('/api/v1/obras', reporteRouter);
 app.use('/api/v1/obras', bitacoraRouter);
+app.use('/api/v1/bitacora', bitacoraRouter);
+app.use('/api/v1/bitacora', bitacoraNotaRouter);
 app.use('/api/v1/obras', estimacionRouter);
+app.use('/api/v1/estimaciones', estimacionDirectaRouter);
 app.use('/api/v1/obras', obraRouter);
 app.use('/api/v1/admin', adminRouter);
 

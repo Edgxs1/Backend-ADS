@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const ESTADOS_REPORTE = ['Validado', 'Por revisar'] as const;
 
+export const ESTADOS_TIPO_DIA = ['Laborado', 'No laborado'] as const;
 export const ESTADOS_TIEMPO = ['Soleado', 'Nublado', 'Lluvia moderada', 'Lluvia intensa'] as const;
 export const ESTADOS_SEÑALAMIENTO = ['Buen estado', 'Mal estado', 'Suficiente', 'Insuficiente'] as const;
 export const ESTADOS_EPP = ['Completo', 'Incompleto', 'Suficiente', 'Insuficiente'] as const;
@@ -18,7 +19,8 @@ const stringArraySchema = z.array(z.string()).default([]);
 export const crearReporteSchema = z.object({
   actividades_realizadas: z.string().trim().optional(),
   notas_relevantes: z.string().trim().optional(),
-  hora_lluvia: z.string().trim().optional(),
+  hora_lluvia: z.number().optional(),
+  tipo_dia: z.enum(ESTADOS_TIPO_DIA).optional(),
   estado_tiempo: z.enum(ESTADOS_TIEMPO).optional(),
   senalamiento_preventivo: z.enum(ESTADOS_SEÑALAMIENTO).optional(),
   equipo_proteccion: z.enum(ESTADOS_EPP).optional(),

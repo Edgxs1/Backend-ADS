@@ -2,7 +2,8 @@ import { supabaseAdmin } from '../config/supabase.js';
 import { AppError } from '../shared/errors/AppError.js';
 
 export const ESTADO_ABIERTA = 'Abierta';
-export const ESTADO_FIRMADA = 'Firmada';
+export const ESTADO_PENDIENTE_FIRMA = 'Pendiente de Firma';
+export const ESTADO_COMPLETADA = 'Completada';
 
 export interface NotaBitacora {
   id_nota: string;
@@ -93,15 +94,18 @@ export async function obtenerNotaPorId(
 ): Promise<NotaBitacora | null> {
   const { data, error } = await supabaseAdmin
     .from('bitacora_notas')
-    .select(COLUMNS)
-    .eq('id_nota', idNota)
-    .maybeSingle();
-
+    .select('*')
+    .eq('id_nota', idNota.trim())
+    .maybeSingle(); 
   if (error) {
     throw new AppError(500, 'No se pudo obtener la nota de bitácora');
   }
 
-  return (data as NotaBitacora | null) ?? null;
+  if (!data) {
+    return null;
+  }
+
+  return data as NotaBitacora;
 }
 
 export async function actualizarTextoNota(
@@ -124,7 +128,7 @@ export async function actualizarTextoNota(
 
 export async function firmarNotaRepo(
   idNota: string,
-  columnaFirma: 'firma_superintendente' | 'firma_supervisor' | 'firma_residente',
+  columnaFirma: string,
   hash: string,
   estado: string,
 ): Promise<NotaBitacora> {
@@ -136,12 +140,13 @@ export async function firmarNotaRepo(
   const { data, error } = await supabaseAdmin
     .from('bitacora_notas')
     .update(payload)
-    .eq('id_nota', idNota)
-    .select(COLUMNS)
+    .eq('id_nota', idNota.trim())
+    .select('*')
     .single();
 
-  if (error || !data) {
-    throw new AppError(404, 'No se encontró la nota para firmar');
+  if (error) {
+    console.error('Error SQL en firmarNotaRepo:', error);
+    throw new AppError(500, `No se pudo guardar la firma: ${error.message}`);
   }
 
   return data as NotaBitacora;

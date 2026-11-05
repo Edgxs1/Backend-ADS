@@ -18,7 +18,8 @@ export interface Reporte {
   actividades_realizadas: string | null;
   notas_relevantes: string | null;
   estado_tiempo: string | null;
-  hora_lluvia: string | null;
+  hora_lluvia: number | null;
+  tipo_dia: string | null;
   senalamiento_preventivo: string | null;
   equipo_proteccion: string | null;
   suministro_materiales: string | null;
@@ -38,7 +39,8 @@ export interface CrearReporteInput {
   id_creador: string;
   actividades_realizadas?: string | null;
   notas_relevantes?: string | null;
-  hora_lluvia?: string | null;
+  hora_lluvia?: number | null;
+  tipo_dia?: string | null;
   estado_tiempo?: string | null;
   senalamiento_preventivo?: string | null;
   equipo_proteccion?: string | null;
@@ -74,7 +76,7 @@ function extraerCorreo(
 }
 
 const COLUMNS =
-  'id_reporte, id_obra, id_creador, estado, created_at, condicionantes, problematica, interferencias, conceptos_relevantes, recursos_utilizados, actividades_realizadas, notas_relevantes, estado_tiempo, hora_lluvia, senalamiento_preventivo, equipo_proteccion, suministro_materiales, estado_personal, estado_maquinaria, estado_equipo, avance_general, fecha_estimada_conclusion';
+  'id_reporte, id_obra, id_creador, estado, created_at, condicionantes, problematica, interferencias, conceptos_relevantes, recursos_utilizados, actividades_realizadas, notas_relevantes, estado_tiempo, hora_lluvia, tipo_dia, senalamiento_preventivo, equipo_proteccion, suministro_materiales, estado_personal, estado_maquinaria, estado_equipo, avance_general, fecha_estimada_conclusion';
 
 export async function crearReporte(input: CrearReporteInput): Promise<Reporte> {
   const { data, error } = await supabaseAdmin
@@ -85,6 +87,7 @@ export async function crearReporte(input: CrearReporteInput): Promise<Reporte> {
       actividades_realizadas: input.actividades_realizadas ?? null,
       notas_relevantes: input.notas_relevantes ?? null,
       hora_lluvia: input.hora_lluvia ?? null,
+      tipo_dia: input.tipo_dia ?? null,
       estado_tiempo: input.estado_tiempo ?? null,
       senalamiento_preventivo: input.senalamiento_preventivo ?? null,
       equipo_proteccion: input.equipo_proteccion ?? null,
@@ -147,7 +150,8 @@ export async function obtenerReportePorId(idReporte: string): Promise<Reporte | 
 export interface ActualizarReporteInput {
   actividades_realizadas?: string | null;
   notas_relevantes?: string | null;
-  hora_lluvia?: string | null;
+  hora_lluvia?: number | null;
+  tipo_dia?: string | null;
   estado_tiempo?: string | null;
   senalamiento_preventivo?: string | null;
   equipo_proteccion?: string | null;
@@ -175,6 +179,7 @@ export async function actualizarReporte(
       actividades_realizadas: input.actividades_realizadas ?? null,
       notas_relevantes: input.notas_relevantes ?? null,
       hora_lluvia: input.hora_lluvia ?? null,
+      tipo_dia: input.tipo_dia ?? null,
       estado_tiempo: input.estado_tiempo ?? null,
       senalamiento_preventivo: input.senalamiento_preventivo ?? null,
       equipo_proteccion: input.equipo_proteccion ?? null,

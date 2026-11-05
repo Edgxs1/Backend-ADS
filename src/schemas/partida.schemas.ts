@@ -5,8 +5,16 @@ export const crearPartidaSchema = z.object({
   descripcion: z.string().trim().min(1).max(500),
 });
 
+export const actualizarPartidaSchema = crearPartidaSchema;
+
 export const partidaObraParamsSchema = z.object({
   id_obra: z.uuid(),
 });
 
+export const partidaIdParamsSchema = z.object({
+  id_obra: z.uuid(),
+  id_partida: z.uuid(),
+});
+
 export type CrearPartidaDto = z.infer<typeof crearPartidaSchema>;
+export type ActualizarPartidaDto = z.infer<typeof actualizarPartidaSchema>;

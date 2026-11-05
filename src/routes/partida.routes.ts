@@ -1,9 +1,14 @@
 import { Router } from 'express';
-import { crear, listar } from '../controllers/partida.controller.js';
+import { actualizar, crear, eliminar, listar } from '../controllers/partida.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { roleMiddleware } from '../middlewares/role.middleware.js';
 import { validateBody, validateParams } from '../middlewares/validate.middleware.js';
-import { crearPartidaSchema, partidaObraParamsSchema } from '../schemas/partida.schemas.js';
+import {
+  actualizarPartidaSchema,
+  crearPartidaSchema,
+  partidaIdParamsSchema,
+  partidaObraParamsSchema,
+} from '../schemas/partida.schemas.js';
 
 export const partidaRouter = Router();
 
@@ -14,6 +19,23 @@ partidaRouter.post(
   roleMiddleware('Superintendente', 'Administrador', { scope: 'obra' }),
   validateBody(crearPartidaSchema),
   crear,
+);
+
+partidaRouter.put(
+  '/:id_obra/partidas/:id_partida',
+  authMiddleware,
+  validateParams(partidaIdParamsSchema),
+  roleMiddleware('Superintendente', 'Administrador', { scope: 'obra' }),
+  validateBody(actualizarPartidaSchema),
+  actualizar,
+);
+
+partidaRouter.delete(
+  '/:id_obra/partidas/:id_partida',
+  authMiddleware,
+  validateParams(partidaIdParamsSchema),
+  roleMiddleware('Superintendente', 'Administrador', { scope: 'obra' }),
+  eliminar,
 );
 
 partidaRouter.get(

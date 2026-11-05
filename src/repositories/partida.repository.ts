@@ -13,6 +13,11 @@ export interface CrearPartidaInput {
   descripcion: string;
 }
 
+export interface ActualizarPartidaInput {
+  clave: string;
+  descripcion: string;
+}
+
 const COLUMNS = 'id_partida, id_obra, clave, descripcion';
 
 export async function crearPartida(
@@ -44,4 +49,49 @@ export async function obtenerPartidasPorObra(idObra: string): Promise<Partida[]>
   }
 
   return (data ?? []) as Partida[];
+}
+
+export async function actualizarPartida(
+  idObra: string,
+  idPartida: string,
+  input: ActualizarPartidaInput,
+): Promise<Partida> {
+  const { data, error } = await supabaseAdmin
+    .from('partidas')
+    .update({ clave: input.clave, descripcion: input.descripcion })
+    .eq('id_obra', idObra)
+    .eq('id_partida', idPartida)
+    .select(COLUMNS)
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError(400, 'No se pudo actualizar la partida');
+  }
+
+  if (!data) {
+    throw new AppError(404, 'Partida no encontrada');
+  }
+
+  return data as Partida;
+}
+
+export async function eliminarPartida(
+  idObra: string,
+  idPartida: string,
+): Promise<void> {
+  const { data, error } = await supabaseAdmin
+    .from('partidas')
+    .delete()
+    .eq('id_obra', idObra)
+    .eq('id_partida', idPartida)
+    .select('id_partida')
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError(400, 'No se pudo eliminar la partida');
+  }
+
+  if (!data) {
+    throw new AppError(404, 'Partida no encontrada');
+  }
 }

@@ -1,10 +1,12 @@
 import type { NextFunction, Request, Response } from 'express';
 import type {
+  CambiarEstadoEstimacionDto,
   CorreccionEstatusDto,
   CrearEstimacionDto,
 } from '../schemas/estimacion.schemas.js';
 import {
   autorizarEstimacion,
+  cambiarEstadoEstimacionPorId,
   corregirEstatusEstimacion,
   eliminarEstimacion,
   enviarAResidente,
@@ -27,14 +29,27 @@ function requerirParam(req: Request, nombre: string): string {
   return valor;
 }
 
+function requerirUsuario(req: Request): string {
+  const user = req.user;
+
+  if (!user) {
+    throw new AppError(401, 'No autorizado: usuario no autenticado');
+  }
+
+  return user.id;
+}
+
 export async function crear(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const idObra = requerirParam(req, 'id_obra');
+    const body = req.body as CrearEstimacionDto;
+    const rawIdObra = req.params['id_obra'] ?? body.id_obra;
+    const idObra = Array.isArray(rawIdObra) ? rawIdObra[0] : rawIdObra;
 
-    const estimacion = await registrarEstimacion(
-      idObra,
-      req.body as CrearEstimacionDto,
-    );
+    if (!idObra) {
+      throw new AppError(400, 'Falta el parámetro id_obra');
+    }
+
+    const estimacion = await registrarEstimacion(idObra, body);
 
     res.status(201).json({ success: true, data: estimacion });
   } catch (error) {
@@ -57,6 +72,7 @@ export async function enviar(req: Request, res: Response, next: NextFunction): P
     const estimacion = await enviarEstimacion(
       requerirParam(req, 'id_obra'),
       requerirParam(req, 'id_estimacion'),
+      requerirUsuario(req),
     );
 
     res.status(200).json({ success: true, data: estimacion });
@@ -74,6 +90,7 @@ export async function enviarResidente(
     const estimacion = await enviarAResidente(
       requerirParam(req, 'id_obra'),
       requerirParam(req, 'id_estimacion'),
+      requerirUsuario(req),
     );
 
     res.status(200).json({ success: true, data: estimacion });
@@ -87,6 +104,7 @@ export async function autorizar(req: Request, res: Response, next: NextFunction)
     const estimacion = await autorizarEstimacion(
       requerirParam(req, 'id_obra'),
       requerirParam(req, 'id_estimacion'),
+      requerirUsuario(req),
     );
 
     res.status(200).json({ success: true, data: estimacion });
@@ -100,6 +118,27 @@ export async function rechazar(req: Request, res: Response, next: NextFunction):
     const estimacion = await rechazarEstimacion(
       requerirParam(req, 'id_obra'),
       requerirParam(req, 'id_estimacion'),
+      requerirUsuario(req),
+    );
+
+    res.status(200).json({ success: true, data: estimacion });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function cambiarEstado(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { estado } = req.body as CambiarEstadoEstimacionDto;
+
+    const estimacion = await cambiarEstadoEstimacionPorId(
+      requerirParam(req, 'id'),
+      estado,
+      requerirUsuario(req),
     );
 
     res.status(200).json({ success: true, data: estimacion });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ESTADOS_NOTA = ['Abierta', 'Firmada'] as const;
+export const ESTADOS_NOTA = ['Abierta', 'Pendiente de Firma', 'Completada'] as const;
 
 export const crearNotaSchema = z.object({
   texto: z.string().trim().min(5).max(2000),
@@ -21,6 +21,10 @@ export const bitacoraObraParamsSchema = z.object({
 export const notaParamsSchema = z.object({
   id_obra: z.uuid(),
   id_nota: z.uuid(),
+});
+
+export const notaIdParamsSchema = z.object({
+  id: z.uuid(),
 });
 
 export const firmarNotaSchema = z.object({

@@ -1,9 +1,14 @@
 import { Router } from 'express';
-import { crear, listar } from '../controllers/catalogo.controller.js';
+import { actualizar, crear, eliminar, listar } from '../controllers/catalogo.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { roleMiddleware } from '../middlewares/role.middleware.js';
 import { validateBody, validateParams } from '../middlewares/validate.middleware.js';
-import { catalogoObraParamsSchema, crearConceptoSchema } from '../schemas/catalogo.schemas.js';
+import {
+  actualizarConceptoSchema,
+  catalogoConceptoParamsSchema,
+  catalogoObraParamsSchema,
+  crearConceptoSchema,
+} from '../schemas/catalogo.schemas.js';
 import {
   actualizarRecursos,
   crearRecursos,
@@ -25,6 +30,23 @@ catalogoRouter.post(
   roleMiddleware('Superintendente', 'Administrador', { scope: 'obra' }),
   validateBody(crearConceptoSchema),
   crear,
+);
+
+catalogoRouter.put(
+  '/:id_obra/catalogos/:id_concepto',
+  authMiddleware,
+  validateParams(catalogoConceptoParamsSchema),
+  roleMiddleware('Superintendente', 'Administrador', { scope: 'obra' }),
+  validateBody(actualizarConceptoSchema),
+  actualizar,
+);
+
+catalogoRouter.delete(
+  '/:id_obra/catalogos/:id_concepto',
+  authMiddleware,
+  validateParams(catalogoConceptoParamsSchema),
+  roleMiddleware('Superintendente', 'Administrador', { scope: 'obra' }),
+  eliminar,
 );
 
 catalogoRouter.get(

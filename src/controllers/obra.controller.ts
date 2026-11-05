@@ -33,7 +33,7 @@ export async function listarAsignadas(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const idUsuario = req.user?.id;
+    const idUsuario = (req.user as any)?.id || (req.user as any)?.id_usuario;
 
     if (!idUsuario) {
       throw new AppError(401, 'No autorizado: usuario no autenticado');

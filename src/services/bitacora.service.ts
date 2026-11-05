@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
-  ESTADO_ABIERTA,
-  ESTADO_FIRMADA,
+  ESTADO_COMPLETADA,
+  ESTADO_PENDIENTE_FIRMA,
   firmarNotaRepo,
   obtenerNotaPorId,
   obtenerNotasPorObra as obtenerNotasRepo,
@@ -22,7 +22,7 @@ import type { Rol } from '../shared/types/roles.js';
 import type { CrearNotaDto, EditarNotaDto } from '../schemas/bitacora.schemas.js';
 import { generarFirmaBitacora } from '../shared/crypto/firma-bitacora.js';
 import { env } from '../config/env.js';
-import { supabaseAdmin } from '../config/supabase.js';
+import { createAnonClient } from '../config/supabase.js';
 
 async function obtenerUsuarioYRol(idUsuario: string): Promise<{
   rol: Rol;
@@ -64,10 +64,10 @@ async function asegurarEditablePorFirmas(
     throw new AppError(404, 'Nota de bitácora no encontrada');
   }
 
-  if (nota.estado === ESTADO_FIRMADA) {
+  if (nota.estado === ESTADO_COMPLETADA) {
     throw new AppError(
       403,
-      'Nota inmutable: una nota firmada no puede editarse ni eliminarse',
+      'Nota inmutable: una nota completada no puede editarse ni eliminarse',
     );
   }
 
@@ -153,8 +153,8 @@ export async function firmarNota(idNota: string, idUsuario: string): Promise<Not
     throw new AppError(404, 'Nota de bitácora no encontrada');
   }
 
-  if (nota.estado === ESTADO_FIRMADA) {
-    throw new AppError(403, 'Nota inmutable: la nota ya se encuentra firmada');
+  if (nota.estado === ESTADO_COMPLETADA) {
+    throw new AppError(403, 'Nota inmutable: la nota ya se encuentra completada');
   }
 
   if (nota[columnaFirma]) {
@@ -163,18 +163,19 @@ export async function firmarNota(idNota: string, idUsuario: string): Promise<Not
 
   const hash = generarFirmaBitacora({ idNota, rfc });
 
-  const notaFirmada = await firmarNotaRepo(idNota, columnaFirma, hash, nota.estado);
+  const firmaSuperintendente =
+    columnaFirma === 'firma_superintendente' ? hash : nota.firma_superintendente;
+  const firmaSupervisor =
+    columnaFirma === 'firma_supervisor' ? hash : nota.firma_supervisor;
+  const firmaResidente =
+    columnaFirma === 'firma_residente' ? hash : nota.firma_residente;
 
-  if (
-    notaFirmada.firma_superintendente &&
-    notaFirmada.firma_supervisor &&
-    notaFirmada.firma_residente &&
-    notaFirmada.estado !== ESTADO_FIRMADA
-  ) {
-    return firmarNotaRepo(idNota, columnaFirma, hash, ESTADO_FIRMADA);
-  }
+  const completa = Boolean(
+    firmaSuperintendente && firmaSupervisor && firmaResidente,
+  );
+  const nuevoEstado = completa ? ESTADO_COMPLETADA : ESTADO_PENDIENTE_FIRMA;
 
-  return notaFirmada;
+  return firmarNotaRepo(idNota, columnaFirma, hash, nuevoEstado);
 }
 
 export async function sellarNota(
@@ -201,7 +202,8 @@ export async function sellarNota(
     throw new AppError(401, 'No autorizado');
   }
 
-  const { error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+  const authClient = createAnonClient();
+  const { error: signInError } = await authClient.auth.signInWithPassword({
     email: usuario.correo,
     password,
   });
@@ -210,14 +212,18 @@ export async function sellarNota(
     throw new AppError(401, 'Unauthorized');
   }
 
+  console.log('--- DEBUG FIRMA ---');
+  console.log('ID Nota buscado:', idNota);
+  console.log('Usuario intentando firmar:', idUsuario, rol);
   const nota = await obtenerNotaPorId(idNota);
+  console.log('Resultado de la BD:', nota);
 
   if (!nota) {
     throw new AppError(404, 'Nota de bitácora no encontrada');
   }
 
-  if (nota.estado === ESTADO_FIRMADA) {
-    throw new AppError(403, 'Nota inmutable: la nota ya se encuentra firmada');
+  if (nota.estado === ESTADO_COMPLETADA) {
+    throw new AppError(403, 'Nota inmutable: la nota ya se encuentra completada');
   }
 
   if (nota[columnaFirma]) {
@@ -231,10 +237,14 @@ export async function sellarNota(
 
   const notaFirmada = await inyectarFirmaNota(idNota, columnaFirma, hash);
 
-  if (notaFirmada.firma_superintendente && notaFirmada.firma_supervisor && notaFirmada.firma_residente) {
-    await actualizarEstadoNota(idNota, ESTADO_FIRMADA);
-    return { ...notaFirmada, estado: ESTADO_FIRMADA };
-  }
+  const completa = Boolean(
+    notaFirmada.firma_superintendente &&
+      notaFirmada.firma_supervisor &&
+      notaFirmada.firma_residente,
+  );
+  const nuevoEstado = completa ? ESTADO_COMPLETADA : ESTADO_PENDIENTE_FIRMA;
 
-  return notaFirmada;
+  await actualizarEstadoNota(idNota, nuevoEstado);
+
+  return { ...notaFirmada, estado: nuevoEstado };
 }

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   autorizar,
+  cambiarEstado,
   caratula,
   correccionEstatus,
   crear,
@@ -14,8 +15,10 @@ import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { roleMiddleware } from '../middlewares/role.middleware.js';
 import { validateBody, validateParams } from '../middlewares/validate.middleware.js';
 import {
+  cambiarEstadoEstimacionSchema,
   correccionEstatusSchema,
   crearEstimacionSchema,
+  estimacionIdParamsSchema,
   estimacionObraParamsSchema,
   estimacionParamsSchema,
 } from '../schemas/estimacion.schemas.js';
@@ -51,7 +54,7 @@ estimacionRouter.patch(
   '/:id_obra/estimaciones/:id_estimacion/enviar-supervisor',
   authMiddleware,
   validateParams(estimacionParamsSchema),
-  roleMiddleware('Superintendente', { scope: 'obra' }),
+  roleMiddleware('Supervisor', { scope: 'obra' }),
   enviar,
 );
 
@@ -59,7 +62,7 @@ estimacionRouter.patch(
   '/:id_obra/estimaciones/:id_estimacion/enviar',
   authMiddleware,
   validateParams(estimacionParamsSchema),
-  roleMiddleware('Superintendente', { scope: 'obra' }),
+  roleMiddleware('Supervisor', { scope: 'obra' }),
   enviar,
 );
 
@@ -110,4 +113,37 @@ estimacionRouter.get(
   validateParams(estimacionParamsSchema),
   roleMiddleware(...ROLES_OPERATIVOS, { scope: 'obra' }),
   caratula,
+);
+
+/**
+ * Endpoints directos solicitados por el RF3:
+ *   POST   /api/v1/estimaciones
+ *   PUT    /api/v1/estimaciones/:id/estado
+ *   GET    /api/v1/estimaciones/:id_obra
+ */
+export const estimacionDirectaRouter = Router();
+
+estimacionDirectaRouter.post(
+  '/',
+  authMiddleware,
+  roleMiddleware('Superintendente', { scope: 'obra' }),
+  validateBody(crearEstimacionSchema),
+  crear,
+);
+
+estimacionDirectaRouter.put(
+  '/:id/estado',
+  authMiddleware,
+  validateParams(estimacionIdParamsSchema),
+  roleMiddleware('Administrador', 'Supervisor', 'Residente'),
+  validateBody(cambiarEstadoEstimacionSchema),
+  cambiarEstado,
+);
+
+estimacionDirectaRouter.get(
+  '/:id_obra',
+  authMiddleware,
+  validateParams(estimacionObraParamsSchema),
+  roleMiddleware(...ROLES_OPERATIVOS, { scope: 'obra' }),
+  listar,
 );

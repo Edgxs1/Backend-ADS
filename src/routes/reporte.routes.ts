@@ -58,7 +58,7 @@ reporteRouter.get(
   listar,
 );
 
-reporteRouter.patch(
+reporteRouter.put(
   '/:id_obra/reportes/:id_reporte/estado',
   authMiddleware,
   validateParams(reporteParamsSchema),

@@ -5,6 +5,7 @@ import {
   editar,
   eliminar,
   firmar,
+  firmarNotaController,
   listar,
 } from '../controllers/bitacora.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
@@ -15,17 +16,16 @@ import {
   crearNotaSchema,
   editarNotaSchema,
   firmarNotaSchema,
+  notaIdParamsSchema,
   notaParamsSchema,
 } from '../schemas/bitacora.schemas.js';
 
 export const bitacoraRouter = Router();
 
 const ROLES_OPERATIVOS = [
-  'Administrador',
   'Superintendente',
   'Supervisor',
   'Residente',
-  'Directivo',
 ] as const;
 
 const ROLES_FIRMANTES = ['Superintendente', 'Supervisor', 'Residente'] as const;
@@ -43,7 +43,7 @@ bitacoraRouter.get(
   '/:id_obra/bitacora',
   authMiddleware,
   validateParams(bitacoraObraParamsSchema),
-  roleMiddleware(...ROLES_OPERATIVOS, { scope: 'obra' }),
+  roleMiddleware('Administrador', ...ROLES_OPERATIVOS),
   listar,
 );
 
@@ -51,7 +51,7 @@ bitacoraRouter.patch(
   '/:id_obra/bitacora/:id_nota',
   authMiddleware,
   validateParams(notaParamsSchema),
-  roleMiddleware(...ROLES_OPERATIVOS, { scope: 'obra' }),
+  roleMiddleware('Administrador', ...ROLES_OPERATIVOS),
   validateBody(editarNotaSchema),
   editar,
 );
@@ -60,7 +60,7 @@ bitacoraRouter.delete(
   '/:id_obra/bitacora/:id_nota',
   authMiddleware,
   validateParams(notaParamsSchema),
-  roleMiddleware(...ROLES_OPERATIVOS, { scope: 'obra' }),
+  roleMiddleware('Administrador', ...ROLES_OPERATIVOS),
   eliminar,
 );
 
@@ -81,9 +81,20 @@ bitacoraRouter.patch(
 );
 
 bitacoraRouter.post(
-  '/bitacora/:id/firmar',
+  '/:id/firmar',
   authMiddleware,
   roleMiddleware(...ROLES_FIRMANTES),
   validateBody(firmarNotaSchema),
-  firmar,
+  firmarNotaController,
+);
+
+export const bitacoraNotaRouter = Router();
+
+bitacoraNotaRouter.put(
+  '/:id',
+  authMiddleware,
+  validateParams(notaIdParamsSchema),
+  roleMiddleware('Administrador', ...ROLES_OPERATIVOS),
+  validateBody(editarNotaSchema),
+  editar,
 );

@@ -1,16 +1,17 @@
 import { z } from 'zod';
 
-export const TIPOS_ESTIMACION = ['Ordinaria', 'Extraordinaria', 'Adicional'] as const;
+export const TIPOS_ESTIMACION = ['Normal', 'Adicional', 'Extraordinaria'] as const;
 
 export const ESTADOS_ESTIMACION = [
-  'Borrador',
-  'Revision Supervisor',
-  'Revision Residente',
-  'Autorizada',
+  'Presentación',
+  'Revisión',
+  'Autorización',
+  'Aprobada',
   'Rechazada',
+  'Anulada',
 ] as const;
 
-export const TIPOS_CON_TOPES_25 = ['Extraordinaria', 'Adicional'] as const;
+export const TIPOS_CON_TOPES_25 = ['Adicional', 'Extraordinaria'] as const;
 
 const fechaSchema = z
   .string()
@@ -28,11 +29,14 @@ export const conceptosEstimacionSchema = z
 
 export const crearEstimacionSchema = z
   .object({
+    id_obra: z.uuid().optional(),
     tipo: z.enum(TIPOS_ESTIMACION, 'Tipo de estimación inválido'),
     fecha: fechaSchema,
     periodo_inicio: fechaSchema,
     periodo_fin: fechaSchema,
     conceptos: conceptosEstimacionSchema,
+    amortizacion: z.number().nonnegative().optional(),
+    retencion_manual: z.number().nonnegative().optional(),
   })
   .refine(
     (data) => data.periodo_fin >= data.periodo_inicio,
@@ -51,12 +55,19 @@ export const estimacionParamsSchema = z.object({
   id_estimacion: z.uuid(),
 });
 
+export const estimacionIdParamsSchema = z.object({
+  id: z.uuid(),
+});
+
 export const correccionEstatusSchema = z.object({
   estado: z.enum(ESTADOS_ESTIMACION, 'Estado inválido'),
 });
+
+export const cambiarEstadoEstimacionSchema = correccionEstatusSchema;
 
 export type CrearEstimacionDto = z.infer<typeof crearEstimacionSchema>;
 export type ConceptoEstimacionDto = z.infer<typeof conceptosEstimacionSchema>[number];
 export type TipoEstimacion = (typeof TIPOS_ESTIMACION)[number];
 export type EstadoEstimacion = (typeof ESTADOS_ESTIMACION)[number];
 export type CorreccionEstatusDto = z.infer<typeof correccionEstatusSchema>;
+export type CambiarEstadoEstimacionDto = z.infer<typeof cambiarEstadoEstimacionSchema>;

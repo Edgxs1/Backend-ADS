@@ -12,8 +12,16 @@ export const crearConceptoSchema = z.object({
   precio_unitario: z.number().positive(),
 });
 
+export const actualizarConceptoSchema = crearConceptoSchema;
+
 export const catalogoObraParamsSchema = z.object({
   id_obra: z.uuid(),
 });
 
+export const catalogoConceptoParamsSchema = z.object({
+  id_obra: z.uuid(),
+  id_concepto: z.uuid(),
+});
+
 export type CrearConceptoDto = z.infer<typeof crearConceptoSchema>;
+export type ActualizarConceptoDto = z.infer<typeof actualizarConceptoSchema>;

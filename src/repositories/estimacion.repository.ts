@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase.js';
 import { AppError } from '../shared/errors/AppError.js';
 import { TIPOS_CON_TOPES_25 } from '../schemas/estimacion.schemas.js';
+import { aCentavos, aplicarPorcentaje, deCentavos } from '../shared/utils/money.js';
 import type { FirmasEstimacion } from '../shared/crypto/firma.js';
 import type {
   ConceptoEstimacionDto,
@@ -9,11 +10,21 @@ import type {
   TipoEstimacion,
 } from '../schemas/estimacion.schemas.js';
 
-export const ESTADO_ESTIMACION_BORRADOR = 'Borrador';
-export const ESTADO_REVISION_SUPERVISOR = 'Revision Supervisor';
-export const ESTADO_REVISION_RESIDENTE = 'Revision Residente';
-export const ESTADO_AUTORIZADA = 'Autorizada';
+export const ESTADO_PRESENTACION = 'Presentación';
+export const ESTADO_REVISION = 'Revisión';
+export const ESTADO_AUTORIZACION = 'Autorización';
+export const ESTADO_APROBADA = 'Aprobada';
 export const ESTADO_RECHAZADA = 'Rechazada';
+export const ESTADO_ANULADA = 'Anulada';
+
+export const ESTADOS_TERMINALES: readonly EstadoEstimacion[] = [
+  ESTADO_APROBADA,
+  ESTADO_RECHAZADA,
+  ESTADO_ANULADA,
+];
+
+const TASA_IVA_ENTERA = 16;
+const TASA_RETENCION_INSPECCION_ENTERA = 5;
 
 export interface Estimacion {
   id_estimacion: string;
@@ -47,6 +58,9 @@ export interface ConceptoEstimado {
   id_detalle: string;
   id_estimacion: string;
   id_concepto: string;
+  clave: string | null;
+  descripcion: string | null;
+  unidad_medida: string | null;
   cantidad_segun_proyecto: number | null;
   cantidad_hasta_estimacion_anterior: number | null;
   cantidad_de_esta_estimacion: number | null;
@@ -70,7 +84,7 @@ const COLUMNS =
   'id_estimacion, id_obra, id_anticipo, folio, fecha, tipo, estado, periodo_inicio, periodo_fin, importe_estimacion_actual, importe_acumulado_anterior, importe_acumulado_actual, porcentaje_anticipo_aplicado, importe_amortizacion_actual, importe_amortizado_acumulado_anterior, porcentaje_iva_aplicado, importe_iva, porcentaje_retencion_sfp, importe_retencion_sfp, importe_retencion_atraso_programa, importe_neto_a_recibir, firma_superintendente, firma_supervisor, firma_residente, created_at';
 
 const DETALLE_COLUMNS =
-  'id_detalle, id_estimacion, id_concepto, cantidad_segun_proyecto, cantidad_hasta_estimacion_anterior, cantidad_de_esta_estimacion, cantidad_total_estimado, cantidad_por_ejecutar, precio_unitario_snapshot, importe, avance_fisico_monetizado, avance_financiero_cobrado';
+  'id_detalle, id_estimacion, id_concepto, clave, descripcion, unidad_medida, cantidad_segun_proyecto, cantidad_hasta_estimacion_anterior, cantidad_de_esta_estimacion, cantidad_total_estimado, cantidad_por_ejecutar, precio_unitario_snapshot, importe, avance_fisico_monetizado, avance_financiero_cobrado';
 
 /**
  * Genera un folio secuencial por obra con el formato EST-<n>.
@@ -88,6 +102,53 @@ async function generarFolio(idObra: string): Promise<string> {
 
   const siguiente = (count ?? 0) + 1;
   return `EST-${String(siguiente).padStart(3, '0')}`;
+}
+
+export interface DatosCatalogo {
+  precio_unitario: number;
+  cantidad: number;
+  clave: string | null;
+  descripcion: string | null;
+  unidad_medida: string | null;
+}
+
+/**
+ * RF3.12.5 - Regla Crítica de Snapshot.
+ * Obtiene los datos vigentes del catálogo que se copiarán a la estimación.
+ */
+export async function obtenerDatosCatalogo(
+  idObra: string,
+  idsConcepto: string[],
+): Promise<Map<string, DatosCatalogo>> {
+  const { data, error } = await supabaseAdmin
+    .from('catalogos')
+    .select('id_concepto, precio_unitario, cantidad, clave, descripcion, unidad_medida')
+    .eq('id_obra', idObra)
+    .in('id_concepto', idsConcepto);
+
+  if (error) {
+    throw new AppError(500, 'No se pudieron obtener los datos del catálogo');
+  }
+
+  const datos = new Map<string, DatosCatalogo>();
+
+  for (const row of data ?? []) {
+    datos.set(String(row.id_concepto), {
+      precio_unitario: Number(row.precio_unitario),
+      cantidad: Number(row.cantidad),
+      clave: row.clave === null || row.clave === undefined ? null : String(row.clave),
+      descripcion:
+        row.descripcion === null || row.descripcion === undefined
+          ? null
+          : String(row.descripcion),
+      unidad_medida:
+        row.unidad_medida === null || row.unidad_medida === undefined
+          ? null
+          : String(row.unidad_medida),
+    });
+  }
+
+  return datos;
 }
 
 /**
@@ -117,6 +178,41 @@ export async function obtenerPreciosCatalogo(
   return precios;
 }
 
+function calcularMontos(
+  conceptos: ConceptoEstimado[],
+  input: CrearEstimacionInput,
+): Record<string, number> {
+  const subtotalCentavos = conceptos.reduce(
+    (total, concepto) => total + aCentavos(concepto.importe),
+    0,
+  );
+
+  const ivaCentavos = aplicarPorcentaje(subtotalCentavos, TASA_IVA_ENTERA);
+  const retencionCentavos = Math.round(
+    (subtotalCentavos * TASA_RETENCION_INSPECCION_ENTERA) / 1000,
+  );
+  const amortizacionCentavos = aCentavos(input.amortizacion ?? 0);
+  const retencionManualCentavos = aCentavos(input.retencion_manual ?? 0);
+
+  const netoCentavos =
+    subtotalCentavos +
+    ivaCentavos -
+    retencionCentavos -
+    amortizacionCentavos -
+    retencionManualCentavos;
+
+  return {
+    importe_estimacion_actual: deCentavos(subtotalCentavos),
+    importe_iva: deCentavos(ivaCentavos),
+    porcentaje_iva_aplicado: TASA_IVA_ENTERA / 100,
+    importe_retencion_sfp: deCentavos(retencionCentavos),
+    porcentaje_retencion_sfp: TASA_RETENCION_INSPECCION_ENTERA / 1000,
+    importe_amortizacion_actual: deCentavos(amortizacionCentavos),
+    importe_retencion_atraso_programa: deCentavos(retencionManualCentavos),
+    importe_neto_a_recibir: deCentavos(netoCentavos),
+  };
+}
+
 export async function crearEstimacion(
   input: CrearEstimacionInput,
 ): Promise<EstimacionDetalle> {
@@ -129,7 +225,7 @@ export async function crearEstimacion(
       folio,
       fecha: input.fecha,
       tipo: input.tipo,
-      estado: ESTADO_ESTIMACION_BORRADOR,
+      estado: ESTADO_PRESENTACION,
       periodo_inicio: input.periodo_inicio,
       periodo_fin: input.periodo_fin,
     })
@@ -149,7 +245,20 @@ export async function crearEstimacion(
       input.conceptos,
     );
 
-    return { ...cabecera, conceptos };
+    const montos = calcularMontos(conceptos, input);
+
+    const { data: cabeceraActualizada, error: errorMontos } = await supabaseAdmin
+      .from('estimaciones')
+      .update(montos)
+      .eq('id_estimacion', cabecera.id_estimacion)
+      .select(COLUMNS)
+      .single();
+
+    if (errorMontos || !cabeceraActualizada) {
+      throw new AppError(500, 'No se pudieron guardar los montos de la estimación');
+    }
+
+    return { ...(cabeceraActualizada as Estimacion), conceptos };
   } catch (error) {
     await supabaseAdmin
       .from('estimaciones')
@@ -167,9 +276,9 @@ async function insertarConceptos(
   conceptos: ConceptoEstimacionDto[],
 ): Promise<ConceptoEstimado[]> {
   const idsConcepto = conceptos.map((concepto) => concepto.id_concepto);
-  const precios = await obtenerPreciosCatalogo(idObra, idsConcepto);
+  const catalogo = await obtenerDatosCatalogo(idObra, idsConcepto);
 
-  const faltantes = idsConcepto.filter((id) => !precios.has(id));
+  const faltantes = idsConcepto.filter((id) => !catalogo.has(id));
 
   if (faltantes.length > 0) {
     throw new AppError(
@@ -178,21 +287,37 @@ async function insertarConceptos(
     );
   }
 
+  const historicas = await obtenerCantidadesAutorizadasPorConcepto(
+    idObra,
+    idsConcepto,
+  );
+
   const filas = conceptos.map((concepto) => {
-    const precioSnapshot = precios.get(concepto.id_concepto) ?? 0;
+    const datos = catalogo.get(concepto.id_concepto)!;
+    const precioSnapshot = datos.precio_unitario;
+    const cantidadProyecto = datos.cantidad;
+    const cantidadAnterior = historicas.get(concepto.id_concepto) ?? 0;
+    const cantidadTotal = cantidadAnterior + concepto.cantidad;
     const importe = Number((concepto.cantidad * precioSnapshot).toFixed(2));
 
     return {
       id_estimacion: idEstimacion,
       id_concepto: concepto.id_concepto,
+      clave: datos.clave,
+      descripcion: datos.descripcion,
+      unidad_medida: datos.unidad_medida,
+      cantidad_segun_proyecto: cantidadProyecto,
+      cantidad_hasta_estimacion_anterior: cantidadAnterior,
       cantidad_de_esta_estimacion: concepto.cantidad,
+      cantidad_total_estimado: cantidadTotal,
+      cantidad_por_ejecutar: Math.max(cantidadProyecto - cantidadTotal, 0),
       precio_unitario_snapshot: precioSnapshot,
       importe,
     };
   });
 
   const { data, error } = await supabaseAdmin
-    .from('estimaciones_detalle')
+    .from('estimacion_conceptos')
     .insert(filas)
     .select(DETALLE_COLUMNS);
 
@@ -237,7 +362,7 @@ export async function obtenerDetalleEstimacion(
   }
 
   const { data: conceptos, error: errorConceptos } = await supabaseAdmin
-    .from('estimaciones_detalle')
+    .from('estimacion_conceptos')
     .select(DETALLE_COLUMNS)
     .eq('id_estimacion', idEstimacion)
     .order('id_detalle', { ascending: true });
@@ -299,7 +424,7 @@ export async function autorizarEstimacionConFirmas(
 ): Promise<Estimacion> {
   const { data, error } = await supabaseAdmin
     .from('estimaciones')
-    .update({ estado: ESTADO_AUTORIZADA, ...firmas })
+    .update({ estado: ESTADO_APROBADA, ...firmas })
     .eq('id_estimacion', idEstimacion)
     .select(COLUMNS)
     .single();
@@ -313,7 +438,7 @@ export async function autorizarEstimacionConFirmas(
 
 export async function eliminarEstimacion(idEstimacion: string): Promise<void> {
   const { error: errorDetalle } = await supabaseAdmin
-    .from('estimaciones_detalle')
+    .from('estimacion_conceptos')
     .delete()
     .eq('id_estimacion', idEstimacion);
 
@@ -348,7 +473,7 @@ export async function obtenerCantidadesAutorizadasPorConcepto(
     .from('estimaciones')
     .select('id_estimacion')
     .eq('id_obra', idObra)
-    .eq('estado', ESTADO_AUTORIZADA);
+    .eq('estado', ESTADO_APROBADA);
 
   if (error) {
     throw new AppError(500, 'No se pudieron validar las cantidades históricas');
@@ -361,7 +486,7 @@ export async function obtenerCantidadesAutorizadasPorConcepto(
   }
 
   const { data: detalles, error: errorDetalle } = await supabaseAdmin
-    .from('estimaciones_detalle')
+    .from('estimacion_conceptos')
     .select('id_concepto, cantidad_de_esta_estimacion')
     .in('id_estimacion', idsEstimacion)
     .in('id_concepto', idsConcepto);
@@ -392,7 +517,7 @@ export async function obtenerImporteAdicionalAutorizado(
     .from('estimaciones')
     .select('id_estimacion')
     .eq('id_obra', idObra)
-    .eq('estado', ESTADO_AUTORIZADA)
+    .eq('estado', ESTADO_APROBADA)
     .in('tipo', [...TIPOS_CON_TOPES_25]);
 
   if (error) {
@@ -406,7 +531,7 @@ export async function obtenerImporteAdicionalAutorizado(
   }
 
   const { data: detalles, error: errorDetalle } = await supabaseAdmin
-    .from('estimaciones_detalle')
+    .from('estimacion_conceptos')
     .select('importe')
     .in('id_estimacion', idsEstimacion);
 
