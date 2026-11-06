@@ -47,6 +47,11 @@ export interface CrearAsignacionInput {
   id_obra: string;
 }
 
+export interface ListarUsuariosFiltros {
+  search?: string | undefined;
+  rolId?: number | undefined;
+}
+
 const ASIGNACION_COLUMNS =
   'id_asignacion, id_usuario, id_obra, fecha_inicio, fecha_fin, estado';
 
@@ -139,11 +144,26 @@ export async function crearAsignacion(input: CrearAsignacionInput): Promise<Asig
   return data as Asignacion;
 }
 
-export async function listarUsuarios(): Promise<UsuarioListado[]> {
-  const { data, error } = await supabaseAdmin
+export async function listarUsuarios(
+  filtros: ListarUsuariosFiltros = {},
+): Promise<UsuarioListado[]> {
+  let query = supabaseAdmin
     .from('usuarios')
-    .select('id_usuario, correo, id_rol, rfc, telefono, cedula_profesional, activo')
-    .order('correo', { ascending: true });
+    .select('id_usuario, correo, id_rol, rfc, telefono, cedula_profesional, activo');
+
+  if (filtros.rolId != null) {
+    query = query.eq('id_rol', filtros.rolId);
+  }
+
+  const search = filtros.search?.replace(/[%,()]/g, ' ').trim();
+
+  if (search) {
+    query = query.or(
+      `correo.ilike.%${search}%,rfc.ilike.%${search}%,cedula_profesional.ilike.%${search}%`,
+    );
+  }
+
+  const { data, error } = await query.order('correo', { ascending: true });
 
   if (error) {
     throw new AppError(500, 'No se pudieron obtener los usuarios');

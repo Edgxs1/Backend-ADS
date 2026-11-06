@@ -14,7 +14,7 @@ const fechaSchema = z
   .trim()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD)');
 
-const stringArraySchema = z.array(z.string()).default([]);
+const jsonArraySchema = z.array(z.record(z.string(), z.any())).default([]);
 
 export const crearReporteSchema = z.object({
   actividades_realizadas: z.string().trim().optional(),
@@ -30,11 +30,11 @@ export const crearReporteSchema = z.object({
   estado_equipo: z.enum(ESTADOS_SUFRIMIENTO).optional(),
   avance_general: z.number(),
   fecha_estimada_conclusion: fechaSchema,
-  condicionantes: stringArraySchema,
-  problematica: stringArraySchema,
-  interferencias: stringArraySchema,
-  conceptos_relevantes: stringArraySchema,
-  recursos_utilizados: stringArraySchema,
+  condicionantes: jsonArraySchema,
+  problematica: jsonArraySchema,
+  interferencias: jsonArraySchema,
+  conceptos_relevantes: jsonArraySchema,
+  recursos_utilizados: jsonArraySchema,
 });
 
 export const cambiarEstadoReporteSchema = z.object({

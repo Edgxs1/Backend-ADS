@@ -3,7 +3,9 @@ import type {
   ActualizarRolDto,
   AsignarDto,
   CrearUsuarioDto,
+  ListarUsuariosQueryDto,
 } from '../schemas/admin.schemas.js';
+import { listarUsuariosQuerySchema } from '../schemas/admin.schemas.js';
 import {
   actualizarEstadoUsuario as actualizarEstadoUsuarioService,
   actualizarRolUsuario as actualizarRolUsuarioService,
@@ -24,12 +26,20 @@ export async function crearUsuario(req: Request, res: Response, next: NextFuncti
 }
 
 export async function listarUsuarios(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const usuarios = await listarUsuariosService();
+    const resultado = listarUsuariosQuerySchema.safeParse(req.query);
+
+    if (!resultado.success) {
+      throw new AppError(400, 'Parámetros de búsqueda inválidos', resultado.error.issues);
+    }
+
+    const usuarios = await listarUsuariosService(
+      resultado.data as ListarUsuariosQueryDto,
+    );
     res.status(200).json({ success: true, data: usuarios });
   } catch (error) {
     next(error);

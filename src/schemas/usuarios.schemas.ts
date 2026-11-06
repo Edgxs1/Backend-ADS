@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { passwordSeguroSchema } from './password.schemas.js';
 
 export const RFC_REGEX =
   /^([A-ZÑ&]{3,4})\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[A-Z0-9]{3}$/i;
@@ -37,11 +38,8 @@ export const actualizarPerfilSchema = z
 
 export const cambiarPasswordSchema = z
   .object({
-    nueva_contrasena: z
-      .string()
-      .min(8, 'La contraseña debe tener al menos 8 caracteres')
-      .max(72, 'La contraseña es demasiado larga'),
-    confirmar_contrasena: z.string().min(8, 'Confirma la contraseña'),
+    nueva_contrasena: passwordSeguroSchema,
+    confirmar_contrasena: passwordSeguroSchema,
   })
   .refine((data) => data.nueva_contrasena === data.confirmar_contrasena, {
     message: 'Las contraseñas no coinciden',

@@ -4,17 +4,19 @@ import { AppError } from '../shared/errors/AppError.js';
 export const ESTADO_POR_REVISAR = 'Por revisar';
 export const ESTADO_VALIDADO = 'Validado';
 
+export type JsonObject = Record<string, unknown>;
+
 export interface Reporte {
   id_reporte: string;
   id_obra: string;
   id_creador: string;
   estado: string;
   created_at: string;
-  condicionantes: string[] | null;
-  problematica: string[] | null;
-  interferencias: string[] | null;
-  conceptos_relevantes: string[] | null;
-  recursos_utilizados: string[] | null;
+  condicionantes: JsonObject[] | null;
+  problematica: JsonObject[] | null;
+  interferencias: JsonObject[] | null;
+  conceptos_relevantes: JsonObject[] | null;
+  recursos_utilizados: JsonObject[] | null;
   actividades_realizadas: string | null;
   notas_relevantes: string | null;
   estado_tiempo: string | null;
@@ -50,11 +52,11 @@ export interface CrearReporteInput {
   estado_equipo?: string | null;
   avance_general: number;
   fecha_estimada_conclusion: string;
-  condicionantes: string[];
-  problematica: string[];
-  interferencias: string[];
-  conceptos_relevantes: string[];
-  recursos_utilizados: string[];
+  condicionantes: JsonObject[];
+  problematica: JsonObject[];
+  interferencias: JsonObject[];
+  conceptos_relevantes: JsonObject[];
+  recursos_utilizados: JsonObject[];
 }
 
 interface ReporteRow extends Reporte {
@@ -161,11 +163,11 @@ export interface ActualizarReporteInput {
   estado_equipo?: string | null;
   avance_general: number;
   fecha_estimada_conclusion: string;
-  condicionantes: string[];
-  problematica: string[];
-  interferencias: string[];
-  conceptos_relevantes: string[];
-  recursos_utilizados: string[];
+  condicionantes: JsonObject[];
+  problematica: JsonObject[];
+  interferencias: JsonObject[];
+  conceptos_relevantes: JsonObject[];
+  recursos_utilizados: JsonObject[];
   estado?: string;
 }
 

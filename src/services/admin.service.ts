@@ -14,9 +14,10 @@ import type {
   ActualizarRolDto,
   AsignarDto,
   CrearUsuarioDto,
+  ListarUsuariosQueryDto,
 } from '../schemas/admin.schemas.js';
 import { AppError } from '../shared/errors/AppError.js';
-import { ROL_BY_ID } from '../shared/types/roles.js';
+import { ROL_BY_ID, ROL_ID } from '../shared/types/roles.js';
 import type { Rol } from '../shared/types/roles.js';
 
 export interface UsuarioAdmin {
@@ -82,8 +83,13 @@ export async function crearUsuario(input: CrearUsuarioDto): Promise<UsuarioAdmin
   };
 }
 
-export async function listarUsuarios(): Promise<UsuarioAdmin[]> {
-  const usuarios = await listarUsuariosRepo();
+export async function listarUsuarios(
+  filtros: ListarUsuariosQueryDto = {},
+): Promise<UsuarioAdmin[]> {
+  const usuarios = await listarUsuariosRepo({
+    search: filtros.search,
+    rolId: filtros.rol ? ROL_ID[filtros.rol] : undefined,
+  });
 
   return usuarios.map((usuario) => ({
     id_usuario: usuario.id_usuario,
