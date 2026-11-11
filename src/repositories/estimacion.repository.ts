@@ -7,20 +7,18 @@ import type {
   ConceptoEstimacionDto,
   CrearEstimacionDto,
   EstadoEstimacion,
+  MetadataCaratulaDto,
   TipoEstimacion,
 } from '../schemas/estimacion.schemas.js';
 
-export const ESTADO_PRESENTACION = 'Presentación';
-export const ESTADO_REVISION = 'Revisión';
-export const ESTADO_AUTORIZACION = 'Autorización';
+export const ESTADO_CREADA = 'Creada';
+export const ESTADO_POR_REVISAR = 'Por revisar';
+export const ESTADO_REVISADA = 'Revisada';
+export const ESTADO_DEVUELTA = 'Devuelta';
 export const ESTADO_APROBADA = 'Aprobada';
-export const ESTADO_RECHAZADA = 'Rechazada';
-export const ESTADO_ANULADA = 'Anulada';
 
 export const ESTADOS_TERMINALES: readonly EstadoEstimacion[] = [
   ESTADO_APROBADA,
-  ESTADO_RECHAZADA,
-  ESTADO_ANULADA,
 ];
 
 const TASA_IVA_ENTERA = 16;
@@ -48,6 +46,8 @@ export interface Estimacion {
   importe_retencion_sfp: number | null;
   importe_retencion_atraso_programa: number | null;
   importe_neto_a_recibir: number | null;
+  importe_contrato_snapshot: number | null;
+  metadata_caratula: MetadataCaratulaDto | null;
   firma_superintendente: string | null;
   firma_supervisor: string | null;
   firma_residente: string | null;
@@ -78,10 +78,11 @@ export interface EstimacionDetalle extends Estimacion {
 
 export interface CrearEstimacionInput extends CrearEstimacionDto {
   id_obra: string;
+  importe_contrato_snapshot?: number | null;
 }
 
 const COLUMNS =
-  'id_estimacion, id_obra, id_anticipo, folio, fecha, tipo, estado, periodo_inicio, periodo_fin, importe_estimacion_actual, importe_acumulado_anterior, importe_acumulado_actual, porcentaje_anticipo_aplicado, importe_amortizacion_actual, importe_amortizado_acumulado_anterior, porcentaje_iva_aplicado, importe_iva, porcentaje_retencion_sfp, importe_retencion_sfp, importe_retencion_atraso_programa, importe_neto_a_recibir, firma_superintendente, firma_supervisor, firma_residente, created_at';
+  'id_estimacion, id_obra, id_anticipo, folio, fecha, tipo, estado, periodo_inicio, periodo_fin, importe_estimacion_actual, importe_acumulado_anterior, importe_acumulado_actual, porcentaje_anticipo_aplicado, importe_amortizacion_actual, importe_amortizado_acumulado_anterior, porcentaje_iva_aplicado, importe_iva, porcentaje_retencion_sfp, importe_retencion_sfp, importe_retencion_atraso_programa, importe_neto_a_recibir, importe_contrato_snapshot, metadata_caratula, firma_superintendente, firma_supervisor, firma_residente, created_at';
 
 const DETALLE_COLUMNS =
   'id_detalle, id_estimacion, id_concepto, clave, descripcion, unidad_medida, cantidad_segun_proyecto, cantidad_hasta_estimacion_anterior, cantidad_de_esta_estimacion, cantidad_total_estimado, cantidad_por_ejecutar, precio_unitario_snapshot, importe, avance_fisico_monetizado, avance_financiero_cobrado';
@@ -110,6 +111,90 @@ export interface DatosCatalogo {
   clave: string | null;
   descripcion: string | null;
   unidad_medida: string | null;
+}
+
+export interface AcumuladosAnteriores {
+  importe_acumulado_anterior: number;
+  importe_amortizado_acumulado_anterior: number;
+  cantidades_hasta_estimacion_anterior: Map<string, number>;
+}
+
+/**
+ * RF3.10 - Acumulados financieros anteriores.
+ *
+ * Suma únicamente las estimaciones en estado "Aprobada" cuya fecha sea
+ * estrictamente anterior a `fechaCorte` (la fecha de la estimación que se
+ * está creando o editando). Opcionalmente excluye una estimación para no
+ * contarla dos veces al recalcular una edición.
+ */
+export async function calcularAcumuladosAnteriores(
+  idObra: string,
+  fechaCorte: string,
+  excluirIdEstimacion?: string,
+): Promise<AcumuladosAnteriores> {
+  let consulta = supabaseAdmin
+    .from('estimaciones')
+    .select('id_estimacion, importe_estimacion_actual, importe_amortizacion_actual')
+    .eq('id_obra', idObra)
+    .eq('estado', ESTADO_APROBADA)
+    .lt('fecha', fechaCorte);
+
+  if (excluirIdEstimacion) {
+    consulta = consulta.neq('id_estimacion', excluirIdEstimacion);
+  }
+
+  const { data: estimaciones, error } = await consulta;
+
+  if (error) {
+    throw new AppError(500, 'No se pudieron calcular los acumulados anteriores');
+  }
+
+  const idsEstimacion = (estimaciones ?? []).map((row) =>
+    String(row.id_estimacion),
+  );
+
+  let importeAcumuladoAnterior = 0;
+  let importeAmortizadoAnterior = 0;
+
+  for (const row of estimaciones ?? []) {
+    importeAcumuladoAnterior += Number(row.importe_estimacion_actual ?? 0);
+    importeAmortizadoAnterior += Number(
+      row.importe_amortizacion_actual ?? 0,
+    );
+  }
+
+  const cantidades = new Map<string, number>();
+
+  if (idsEstimacion.length > 0) {
+    const { data: detalles, error: errorDetalle } = await supabaseAdmin
+      .from('estimacion_conceptos')
+      .select('id_concepto, cantidad_de_esta_estimacion')
+      .in('id_estimacion', idsEstimacion);
+
+    if (errorDetalle) {
+      throw new AppError(
+        500,
+        'No se pudieron calcular las cantidades acumuladas anteriores',
+      );
+    }
+
+    for (const row of detalles ?? []) {
+      const idConcepto = String(row.id_concepto);
+      const cantidad = Number(row.cantidad_de_esta_estimacion ?? 0);
+
+      cantidades.set(idConcepto, (cantidades.get(idConcepto) ?? 0) + cantidad);
+    }
+  }
+
+  return {
+    importe_acumulado_anterior: Number(
+      importeAcumuladoAnterior.toFixed(2),
+    ),
+    importe_amortizado_acumulado_anterior: Number(
+      importeAmortizadoAnterior.toFixed(2),
+    ),
+    cantidades_hasta_estimacion_anterior: cantidades,
+  };
 }
 
 /**
@@ -181,18 +266,26 @@ export async function obtenerPreciosCatalogo(
 function calcularMontos(
   conceptos: ConceptoEstimado[],
   input: CrearEstimacionInput,
+  acumulados: AcumuladosAnteriores,
 ): Record<string, number> {
   const subtotalCentavos = conceptos.reduce(
     (total, concepto) => total + aCentavos(concepto.importe),
     0,
   );
 
-  const ivaCentavos = aplicarPorcentaje(subtotalCentavos, TASA_IVA_ENTERA);
+  const amortizacionCentavos = aCentavos(input.amortizacion ?? 0);
+  const baseIvaCentavos = Math.max(0, subtotalCentavos - amortizacionCentavos);
+  const ivaCentavos = aplicarPorcentaje(baseIvaCentavos, TASA_IVA_ENTERA);
   const retencionCentavos = Math.round(
     (subtotalCentavos * TASA_RETENCION_INSPECCION_ENTERA) / 1000,
   );
-  const amortizacionCentavos = aCentavos(input.amortizacion ?? 0);
   const retencionManualCentavos = aCentavos(input.retencion_manual ?? 0);
+  const acumuladoAnteriorCentavos = aCentavos(
+    acumulados.importe_acumulado_anterior,
+  );
+  const amortizadoAnteriorCentavos = aCentavos(
+    acumulados.importe_amortizado_acumulado_anterior,
+  );
 
   const netoCentavos =
     subtotalCentavos +
@@ -203,11 +296,18 @@ function calcularMontos(
 
   return {
     importe_estimacion_actual: deCentavos(subtotalCentavos),
+    importe_acumulado_anterior: deCentavos(acumuladoAnteriorCentavos),
+    importe_acumulado_actual: deCentavos(
+      acumuladoAnteriorCentavos + subtotalCentavos,
+    ),
     importe_iva: deCentavos(ivaCentavos),
     porcentaje_iva_aplicado: TASA_IVA_ENTERA / 100,
     importe_retencion_sfp: deCentavos(retencionCentavos),
     porcentaje_retencion_sfp: TASA_RETENCION_INSPECCION_ENTERA / 1000,
     importe_amortizacion_actual: deCentavos(amortizacionCentavos),
+    importe_amortizado_acumulado_anterior: deCentavos(
+      amortizadoAnteriorCentavos,
+    ),
     importe_retencion_atraso_programa: deCentavos(retencionManualCentavos),
     importe_neto_a_recibir: deCentavos(netoCentavos),
   };
@@ -217,6 +317,10 @@ export async function crearEstimacion(
   input: CrearEstimacionInput,
 ): Promise<EstimacionDetalle> {
   const folio = await generarFolio(input.id_obra);
+  const acumulados = await calcularAcumuladosAnteriores(
+    input.id_obra,
+    input.fecha,
+  );
 
   const { data: estimacion, error: errorEstimacion } = await supabaseAdmin
     .from('estimaciones')
@@ -225,9 +329,11 @@ export async function crearEstimacion(
       folio,
       fecha: input.fecha,
       tipo: input.tipo,
-      estado: ESTADO_PRESENTACION,
+      estado: ESTADO_CREADA,
       periodo_inicio: input.periodo_inicio,
       periodo_fin: input.periodo_fin,
+      importe_contrato_snapshot: input.importe_contrato_snapshot ?? null,
+      metadata_caratula: input.metadata_caratula ?? {},
     })
     .select(COLUMNS)
     .single();
@@ -243,9 +349,10 @@ export async function crearEstimacion(
       cabecera.id_estimacion,
       input.id_obra,
       input.conceptos,
+      acumulados.cantidades_hasta_estimacion_anterior,
     );
 
-    const montos = calcularMontos(conceptos, input);
+    const montos = calcularMontos(conceptos, input, acumulados);
 
     const { data: cabeceraActualizada, error: errorMontos } = await supabaseAdmin
       .from('estimaciones')
@@ -270,10 +377,106 @@ export async function crearEstimacion(
   }
 }
 
+/**
+ * Actualiza una estimación editable conservando folio e id_obra.
+ *
+ * El detalle anterior se elimina después de insertar y recalcular el nuevo
+ * snapshot, de modo que un fallo al insertar no destruya la información previa.
+ */
+export async function actualizarEstimacion(
+  idEstimacion: string,
+  input: CrearEstimacionInput,
+): Promise<EstimacionDetalle> {
+  const { data: anteriores, error: errorAnteriores } = await supabaseAdmin
+    .from('estimacion_conceptos')
+    .select('id_detalle')
+    .eq('id_estimacion', idEstimacion);
+
+  if (errorAnteriores) {
+    throw new AppError(500, 'No se pudieron obtener los conceptos actuales');
+  }
+
+  const acumulados = await calcularAcumuladosAnteriores(
+    input.id_obra,
+    input.fecha,
+    idEstimacion,
+  );
+
+  let conceptos: ConceptoEstimado[] = [];
+
+  try {
+    conceptos = await insertarConceptos(
+      idEstimacion,
+      input.id_obra,
+      input.conceptos,
+      acumulados.cantidades_hasta_estimacion_anterior,
+    );
+
+    const montos = calcularMontos(conceptos, input, acumulados);
+
+    const { data: cabeceraActualizada, error: errorEstimacion } =
+      await supabaseAdmin
+        .from('estimaciones')
+        .update({
+          fecha: input.fecha,
+          tipo: input.tipo,
+          periodo_inicio: input.periodo_inicio,
+          periodo_fin: input.periodo_fin,
+          importe_contrato_snapshot:
+            input.importe_contrato_snapshot ?? null,
+          metadata_caratula: input.metadata_caratula ?? {},
+          ...montos,
+        })
+        .eq('id_estimacion', idEstimacion)
+        .select(COLUMNS)
+        .single();
+
+    if (errorEstimacion || !cabeceraActualizada) {
+      throw new AppError(
+        500,
+        'No se pudieron actualizar los datos de la estimación',
+      );
+    }
+
+    const idsAnteriores = (anteriores ?? []).map((row) =>
+      String(row.id_detalle),
+    );
+
+    if (idsAnteriores.length > 0) {
+      const { error: errorEliminar } = await supabaseAdmin
+        .from('estimacion_conceptos')
+        .delete()
+        .in('id_detalle', idsAnteriores);
+
+      if (errorEliminar) {
+        throw new AppError(
+          500,
+          'No se pudieron reemplazar los conceptos de la estimación',
+        );
+      }
+    }
+
+    return { ...(cabeceraActualizada as Estimacion), conceptos };
+  } catch (error) {
+    const idsNuevos = conceptos.map((concepto) => concepto.id_detalle);
+
+    if (idsNuevos.length > 0) {
+      await supabaseAdmin
+        .from('estimacion_conceptos')
+        .delete()
+        .in('id_detalle', idsNuevos)
+        .then(() => undefined);
+    }
+
+    throw error;
+  }
+}
+
 async function insertarConceptos(
   idEstimacion: string,
   idObra: string,
   conceptos: ConceptoEstimacionDto[],
+  cantidadesAnteriores: Map<string, number>,
 ): Promise<ConceptoEstimado[]> {
   const idsConcepto = conceptos.map((concepto) => concepto.id_concepto);
   const catalogo = await obtenerDatosCatalogo(idObra, idsConcepto);
@@ -287,32 +490,36 @@ async function insertarConceptos(
     );
   }
 
-  const historicas = await obtenerCantidadesAutorizadasPorConcepto(
-    idObra,
-    idsConcepto,
-  );
-
   const filas = conceptos.map((concepto) => {
     const datos = catalogo.get(concepto.id_concepto)!;
-    const precioSnapshot = datos.precio_unitario;
-    const cantidadProyecto = datos.cantidad;
-    const cantidadAnterior = historicas.get(concepto.id_concepto) ?? 0;
+    const precioSnapshot =
+      concepto.precio_unitario_snapshot ?? datos.precio_unitario;
+    const cantidadProyecto =
+      concepto.cantidad_segun_proyecto ?? datos.cantidad;
+    const cantidadAnterior =
+      cantidadesAnteriores.get(concepto.id_concepto) ?? 0;
     const cantidadTotal = cantidadAnterior + concepto.cantidad;
-    const importe = Number((concepto.cantidad * precioSnapshot).toFixed(2));
+    const importe =
+      concepto.importe ??
+      Number((concepto.cantidad * precioSnapshot).toFixed(2));
 
     return {
       id_estimacion: idEstimacion,
       id_concepto: concepto.id_concepto,
-      clave: datos.clave,
-      descripcion: datos.descripcion,
-      unidad_medida: datos.unidad_medida,
+      clave: concepto.clave ?? datos.clave,
+      descripcion: concepto.descripcion ?? datos.descripcion,
+      unidad_medida: concepto.unidad_medida ?? datos.unidad_medida,
       cantidad_segun_proyecto: cantidadProyecto,
       cantidad_hasta_estimacion_anterior: cantidadAnterior,
       cantidad_de_esta_estimacion: concepto.cantidad,
       cantidad_total_estimado: cantidadTotal,
-      cantidad_por_ejecutar: Math.max(cantidadProyecto - cantidadTotal, 0),
+      cantidad_por_ejecutar:
+        concepto.cantidad_por_ejecutar ??
+        Math.max(cantidadProyecto - cantidadTotal, 0),
       precio_unitario_snapshot: precioSnapshot,
       importe,
+      avance_fisico_monetizado: concepto.avance_fisico_monetizado ?? null,
+      avance_financiero_cobrado: concepto.avance_financiero_cobrado ?? null,
     };
   });
 

@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import {
+  actualizar,
+  actualizarPorId,
   autorizar,
   cambiarEstado,
   caratula,
@@ -15,6 +17,7 @@ import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { roleMiddleware } from '../middlewares/role.middleware.js';
 import { validateBody, validateParams } from '../middlewares/validate.middleware.js';
 import {
+  actualizarEstimacionSchema,
   cambiarEstadoEstimacionSchema,
   correccionEstatusSchema,
   crearEstimacionSchema,
@@ -42,6 +45,15 @@ estimacionRouter.post(
   crear,
 );
 
+estimacionRouter.put(
+  '/:id_obra/estimaciones/:id_estimacion',
+  authMiddleware,
+  validateParams(estimacionParamsSchema),
+  roleMiddleware('Superintendente', { scope: 'obra' }),
+  validateBody(actualizarEstimacionSchema),
+  actualizar,
+);
+
 estimacionRouter.get(
   '/:id_obra/estimaciones',
   authMiddleware,
@@ -54,7 +66,7 @@ estimacionRouter.patch(
   '/:id_obra/estimaciones/:id_estimacion/enviar-supervisor',
   authMiddleware,
   validateParams(estimacionParamsSchema),
-  roleMiddleware('Supervisor', { scope: 'obra' }),
+  roleMiddleware('Superintendente', { scope: 'obra' }),
   enviar,
 );
 
@@ -62,7 +74,7 @@ estimacionRouter.patch(
   '/:id_obra/estimaciones/:id_estimacion/enviar',
   authMiddleware,
   validateParams(estimacionParamsSchema),
-  roleMiddleware('Supervisor', { scope: 'obra' }),
+  roleMiddleware('Superintendente', { scope: 'obra' }),
   enviar,
 );
 
@@ -138,6 +150,29 @@ estimacionDirectaRouter.put(
   roleMiddleware('Administrador', 'Supervisor', 'Residente'),
   validateBody(cambiarEstadoEstimacionSchema),
   cambiarEstado,
+);
+
+estimacionDirectaRouter.patch(
+  '/:id/estado',
+  authMiddleware,
+  validateParams(estimacionIdParamsSchema),
+  roleMiddleware(
+    'Administrador',
+    'Superintendente',
+    'Supervisor',
+    'Residente',
+  ),
+  validateBody(cambiarEstadoEstimacionSchema),
+  cambiarEstado,
+);
+
+estimacionDirectaRouter.put(
+  '/:id',
+  authMiddleware,
+  validateParams(estimacionIdParamsSchema),
+  roleMiddleware('Superintendente', { scope: 'obra' }),
+  validateBody(actualizarEstimacionSchema),
+  actualizarPorId,
 );
 
 estimacionDirectaRouter.get(

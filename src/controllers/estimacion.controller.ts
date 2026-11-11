@@ -1,10 +1,13 @@
 import type { NextFunction, Request, Response } from 'express';
 import type {
+  ActualizarEstimacionDto,
   CambiarEstadoEstimacionDto,
   CorreccionEstatusDto,
   CrearEstimacionDto,
 } from '../schemas/estimacion.schemas.js';
 import {
+  actualizarEstimacion,
+  actualizarEstimacionPorId,
   autorizarEstimacion,
   cambiarEstadoEstimacionPorId,
   corregirEstatusEstimacion,
@@ -57,6 +60,51 @@ export async function crear(req: Request, res: Response, next: NextFunction): Pr
   }
 }
 
+export async function actualizar(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const body = req.body as ActualizarEstimacionDto;
+    const rawIdObra = req.params['id_obra'] ?? body.id_obra;
+    const idObra = Array.isArray(rawIdObra) ? rawIdObra[0] : rawIdObra;
+
+    if (!idObra) {
+      throw new AppError(400, 'Falta el parámetro id_obra');
+    }
+
+    const estimacion = await actualizarEstimacion(
+      idObra,
+      requerirParam(req, 'id_estimacion'),
+      body,
+    );
+
+    res.status(200).json({ success: true, data: estimacion });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function actualizarPorId(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const body = req.body as ActualizarEstimacionDto;
+
+    const estimacion = await actualizarEstimacionPorId(
+      requerirParam(req, 'id'),
+      body,
+    );
+
+    res.status(200).json({ success: true, data: estimacion });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function listar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const estimaciones = await listarEstimacionesPorObra(requerirParam(req, 'id_obra'));
@@ -101,10 +149,13 @@ export async function enviarResidente(
 
 export async function autorizar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const { password } = (req.body ?? {}) as { password?: string };
+
     const estimacion = await autorizarEstimacion(
       requerirParam(req, 'id_obra'),
       requerirParam(req, 'id_estimacion'),
       requerirUsuario(req),
+      password,
     );
 
     res.status(200).json({ success: true, data: estimacion });
@@ -133,12 +184,13 @@ export async function cambiarEstado(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { estado } = req.body as CambiarEstadoEstimacionDto;
+    const { estado, password } = req.body as CambiarEstadoEstimacionDto;
 
     const estimacion = await cambiarEstadoEstimacionPorId(
       requerirParam(req, 'id'),
       estado,
       requerirUsuario(req),
+      password,
     );
 
     res.status(200).json({ success: true, data: estimacion });
