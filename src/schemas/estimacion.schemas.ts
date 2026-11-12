@@ -3,17 +3,30 @@ import { z } from 'zod';
 export const TIPOS_ESTIMACION = ['Normal', 'Adicional', 'Extraordinaria'] as const;
 
 /**
+ * RF3.1 - Correspondencia estricta entre el tipo de estimación y el tipo del
+ * catálogo de conceptos. El catálogo usa el masculino "Extraordinario".
+ */
+export const TIPO_CATALOGO_POR_ESTIMACION = {
+  Normal: 'Normal',
+  Adicional: 'Adicional',
+  Extraordinaria: 'Extraordinario',
+} as const;
+
+export type TipoConceptoCatalogo =
+  (typeof TIPO_CATALOGO_POR_ESTIMACION)[keyof typeof TIPO_CATALOGO_POR_ESTIMACION];
+
+/**
  * Estados del flujo de estimaciones (RF3.2 / RF3.3 / RF3.8).
  *
  * Creada -> Por revisar -> Revisada -> Aprobada
- * Por revisar / Revisada -> Devuelta
- * Devuelta -> Por revisar
+ * Revisada -> Rechazada
+ * Rechazada -> Por revisar
  */
 export const ESTADOS_ESTIMACION = [
   'Creada',
   'Por revisar',
   'Revisada',
-  'Devuelta',
+  'Rechazada',
   'Aprobada',
 ] as const;
 

@@ -1,6 +1,9 @@
 import { supabaseAdmin } from '../config/supabase.js';
 import { AppError } from '../shared/errors/AppError.js';
-import { TIPOS_CON_TOPES_25 } from '../schemas/estimacion.schemas.js';
+import {
+  TIPO_CATALOGO_POR_ESTIMACION,
+  TIPOS_CON_TOPES_25,
+} from '../schemas/estimacion.schemas.js';
 import { aCentavos, aplicarPorcentaje, deCentavos } from '../shared/utils/money.js';
 import type { FirmasEstimacion } from '../shared/crypto/firma.js';
 import type {
@@ -14,7 +17,7 @@ import type {
 export const ESTADO_CREADA = 'Creada';
 export const ESTADO_POR_REVISAR = 'Por revisar';
 export const ESTADO_REVISADA = 'Revisada';
-export const ESTADO_DEVUELTA = 'Devuelta';
+export const ESTADO_RECHAZADA = 'Rechazada';
 export const ESTADO_APROBADA = 'Aprobada';
 
 export const ESTADOS_TERMINALES: readonly EstadoEstimacion[] = [
@@ -106,6 +109,7 @@ async function generarFolio(idObra: string): Promise<string> {
 }
 
 export interface DatosCatalogo {
+  tipo: string;
   precio_unitario: number;
   cantidad: number;
   clave: string | null;
@@ -207,7 +211,7 @@ export async function obtenerDatosCatalogo(
 ): Promise<Map<string, DatosCatalogo>> {
   const { data, error } = await supabaseAdmin
     .from('catalogos')
-    .select('id_concepto, precio_unitario, cantidad, clave, descripcion, unidad_medida')
+    .select('id_concepto, tipo, precio_unitario, cantidad, clave, descripcion, unidad_medida')
     .eq('id_obra', idObra)
     .in('id_concepto', idsConcepto);
 
@@ -219,6 +223,7 @@ export async function obtenerDatosCatalogo(
 
   for (const row of data ?? []) {
     datos.set(String(row.id_concepto), {
+      tipo: String(row.tipo),
       precio_unitario: Number(row.precio_unitario),
       cantidad: Number(row.cantidad),
       clave: row.clave === null || row.clave === undefined ? null : String(row.clave),
@@ -348,6 +353,7 @@ export async function crearEstimacion(
     const conceptos = await insertarConceptos(
       cabecera.id_estimacion,
       input.id_obra,
+      input.tipo,
       input.conceptos,
       acumulados.cantidades_hasta_estimacion_anterior,
     );
@@ -408,6 +414,7 @@ export async function actualizarEstimacion(
     conceptos = await insertarConceptos(
       idEstimacion,
       input.id_obra,
+      input.tipo,
       input.conceptos,
       acumulados.cantidades_hasta_estimacion_anterior,
     );
@@ -475,6 +482,7 @@ export async function actualizarEstimacion(
 async function insertarConceptos(
   idEstimacion: string,
   idObra: string,
+  tipoEstimacion: TipoEstimacion,
   conceptos: ConceptoEstimacionDto[],
   cantidadesAnteriores: Map<string, number>,
 ): Promise<ConceptoEstimado[]> {
@@ -487,6 +495,22 @@ async function insertarConceptos(
     throw new AppError(
       400,
       `Los siguientes conceptos no pertenecen al catálogo de la obra: ${faltantes.join(', ')}`,
+    );
+  }
+
+  const tipoRequerido = TIPO_CATALOGO_POR_ESTIMACION[tipoEstimacion];
+  const tiposIncorrectos = conceptos
+    .map((concepto) => ({
+      id: concepto.id_concepto,
+      tipo: catalogo.get(concepto.id_concepto)?.tipo ?? null,
+    }))
+    .filter(({ tipo }) => tipo !== tipoRequerido)
+    .map(({ id, tipo }) => `${id} (tipo catálogo: ${tipo ?? 'desconocido'})`);
+
+  if (tiposIncorrectos.length > 0) {
+    throw new AppError(
+      400,
+      `RF3.1 - Los siguientes conceptos no pertenecen al catálogo "${tipoRequerido}": ${tiposIncorrectos.join(', ')}`,
     );
   }
 

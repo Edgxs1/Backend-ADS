@@ -18,6 +18,9 @@ import {
   estimacionDirectaRouter,
   estimacionRouter,
 } from './routes/estimacion.routes.js';
+import { dashboardRouter } from './routes/dashboard.routes.js';
+import { pendientesRouter } from './routes/pendientes.routes.js';
+import { compendioRouter } from './routes/compendio.routes.js';
 
 const app = express();
 
@@ -54,6 +57,9 @@ app.use('/api/v1/bitacora', bitacoraRouter);
 app.use('/api/v1/bitacora', bitacoraNotaRouter);
 app.use('/api/v1/obras', estimacionRouter);
 app.use('/api/v1/estimaciones', estimacionDirectaRouter);
+app.use('/api/v1/obras', dashboardRouter);
+app.use('/api/v1/obras', compendioRouter);
+app.use('/api/v1/pendientes', pendientesRouter);
 app.use('/api/v1/obras', obraRouter);
 app.use('/api/v1/admin', adminRouter);
 

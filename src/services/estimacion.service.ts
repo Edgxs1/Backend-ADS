@@ -1,7 +1,7 @@
 import {
   ESTADO_APROBADA,
   ESTADO_CREADA,
-  ESTADO_DEVUELTA,
+  ESTADO_RECHAZADA,
   ESTADO_POR_REVISAR,
   ESTADO_REVISADA,
   crearEstimacion as crearEstimacionRepo,
@@ -268,6 +268,8 @@ export async function registrarEstimacion(
   idObra: string,
   input: RegistrarEstimacionInput,
 ): Promise<EstimacionDetalle> {
+  validarVentanaPresentacion();
+
   await validarAvanceFisicoReportado(idObra, input.conceptos);
   await validarLimiteAvanceFisico(idObra, input.conceptos, input.fecha);
 
@@ -371,13 +373,13 @@ export async function obtenerCaratulaOficial(
 }
 
 function esEstimacionEditable(estado: string): boolean {
-  return estado === ESTADO_CREADA || estado === ESTADO_DEVUELTA;
+  return estado === ESTADO_CREADA || estado === ESTADO_RECHAZADA;
 }
 
 /**
  * RF3.8 - Inmutabilidad.
  *
- * Solo las estimaciones en estado "Creada" o "Devuelta" pueden editarse.
+ * Solo las estimaciones en estado "Creada" o "Rechazada" pueden editarse.
  * Una estimación "Aprobada" (y cualquier estado en revisión) queda bloqueada.
  * El folio se conserva porque el UPDATE nunca lo incluye.
  */
@@ -402,7 +404,7 @@ export async function actualizarEstimacion(
   if (!esEstimacionEditable(estimacion.estado)) {
     throw new AppError(
       409,
-      `RF3.8 - Solo se pueden editar estimaciones en estado "${ESTADO_CREADA}" o "${ESTADO_DEVUELTA}"`,
+      `RF3.8 - Solo se pueden editar estimaciones en estado "${ESTADO_CREADA}" o "${ESTADO_RECHAZADA}"`,
     );
   }
 
@@ -463,9 +465,9 @@ export async function actualizarEstimacionPorId(
 
 const TRANSICIONES_PERMITIDAS: Record<EstadoEstimacion, EstadoEstimacion[]> = {
   [ESTADO_CREADA]: [ESTADO_POR_REVISAR],
-  [ESTADO_POR_REVISAR]: [ESTADO_REVISADA, ESTADO_DEVUELTA],
-  [ESTADO_REVISADA]: [ESTADO_APROBADA, ESTADO_DEVUELTA],
-  [ESTADO_DEVUELTA]: [ESTADO_POR_REVISAR],
+  [ESTADO_POR_REVISAR]: [ESTADO_REVISADA],
+  [ESTADO_REVISADA]: [ESTADO_APROBADA, ESTADO_RECHAZADA],
+  [ESTADO_RECHAZADA]: [ESTADO_POR_REVISAR],
   [ESTADO_APROBADA]: [],
 };
 
@@ -480,6 +482,84 @@ async function obtenerRolUsuario(idUsuario: string): Promise<Rol> {
   return rol;
 }
 
+const DIA_FIN_PRESENTACION = 5;
+const DIA_INICIO_REVISION = 6;
+const DIA_FIN_REVISION = 10;
+const DIA_INICIO_AUTORIZACION = 11;
+const DIA_FIN_AUTORIZACION = 15;
+const DIA_INICIO_TRASLADO = 16;
+const MENSAJE_TRASLADO =
+  'Fuera de tiempo. El proceso superó los 15 días naturales; la estimación se trasladará al periodo del siguiente mes';
+
+function diaActualDelMes(): number {
+  return new Date().getDate();
+}
+
+/**
+ * RF3.3 - Ventana de presentación: días 1 al 5.
+ * Aplica a la creación y al envío por parte del Superintendente.
+ */
+function validarVentanaPresentacion(): void {
+  const dia = diaActualDelMes();
+
+  if (dia >= DIA_INICIO_TRASLADO) {
+    throw new AppError(400, MENSAJE_TRASLADO);
+  }
+
+  if (dia < 1 || dia > DIA_FIN_PRESENTACION) {
+    throw new AppError(
+      400,
+      'Fuera de tiempo. La presentación de estimaciones solo está permitida del día 1 al 5 del mes.',
+    );
+  }
+}
+
+/**
+ * RF3.3 / RF3.4 - Ventanas de revisión y autorización.
+ * Supervisor: días 6 al 10. Residente: días 11 al 15.
+ * A partir del día 16 se aplica la regla de traslado al siguiente periodo.
+ */
+function validarVentanaTransicion(rol: Rol): void {
+  if (rol === 'Administrador') {
+    return;
+  }
+
+  const dia = diaActualDelMes();
+
+  if (rol === 'Superintendente') {
+    validarVentanaPresentacion();
+    return;
+  }
+
+  if (rol === 'Supervisor') {
+    if (dia >= DIA_INICIO_TRASLADO) {
+      throw new AppError(400, MENSAJE_TRASLADO);
+    }
+
+    if (dia < DIA_INICIO_REVISION || dia > DIA_FIN_REVISION) {
+      throw new AppError(
+        400,
+        'Fuera de tiempo. La revisión del Supervisor solo está permitida del día 6 al 10 del mes.',
+      );
+    }
+
+    return;
+  }
+
+  if (rol === 'Residente') {
+    if (dia >= DIA_INICIO_TRASLADO) {
+      throw new AppError(400, MENSAJE_TRASLADO);
+    }
+
+    if (dia < DIA_INICIO_AUTORIZACION || dia > DIA_FIN_AUTORIZACION) {
+      throw new AppError(
+        400,
+        'Fuera de tiempo. La autorización del Residente solo está permitida del día 11 al 15 del mes.',
+      );
+    }
+  }
+}
+
 function validarRolTransicion(
   rol: Rol,
   desde: EstadoEstimacion,
@@ -492,7 +572,7 @@ function validarRolTransicion(
   if (rol === 'Superintendente') {
     const puedeEnviar =
       (desde === ESTADO_CREADA && hacia === ESTADO_POR_REVISAR) ||
-      (desde === ESTADO_DEVUELTA && hacia === ESTADO_POR_REVISAR);
+      (desde === ESTADO_RECHAZADA && hacia === ESTADO_POR_REVISAR);
 
     if (puedeEnviar) {
       return;
@@ -506,8 +586,7 @@ function validarRolTransicion(
 
   if (rol === 'Supervisor') {
     const puedeRevisar =
-      desde === ESTADO_POR_REVISAR &&
-      (hacia === ESTADO_REVISADA || hacia === ESTADO_DEVUELTA);
+      desde === ESTADO_POR_REVISAR && hacia === ESTADO_REVISADA;
 
     if (puedeRevisar) {
       return;
@@ -515,14 +594,14 @@ function validarRolTransicion(
 
     throw new AppError(
       403,
-      'Acceso denegado: el Supervisor solo puede revisar o devolver la estimación',
+      'Acceso denegado: el Supervisor solo puede pasar la estimación de "Por revisar" a "Revisada"',
     );
   }
 
   if (rol === 'Residente') {
     const puedeAutorizar =
       desde === ESTADO_REVISADA &&
-      (hacia === ESTADO_APROBADA || hacia === ESTADO_DEVUELTA);
+      (hacia === ESTADO_APROBADA || hacia === ESTADO_RECHAZADA);
 
     if (puedeAutorizar) {
       return;
@@ -530,7 +609,7 @@ function validarRolTransicion(
 
     throw new AppError(
       403,
-      'Acceso denegado: el Residente solo puede aprobar o devolver la estimación',
+      'Acceso denegado: el Residente solo puede aprobar o rechazar la estimación',
     );
   }
 
@@ -579,9 +658,9 @@ async function verificarPasswordUsuario(
 
 /**
  * RF3.2 / RF3.3 / RF3.9 - Transición de estado con reglas estrictas por rol.
- * - Superintendente: Creada/Devuelta -> Por revisar.
- * - Supervisor: Por revisar -> Revisada o Devuelta.
- * - Residente: Revisada -> Aprobada (con contraseña) o Devuelta.
+ * - Superintendente: Creada/Rechazada -> Por revisar (días 1 al 5).
+ * - Supervisor: Por revisar -> Revisada (días 6 al 10).
+ * - Residente: Revisada -> Aprobada (con contraseña) o Rechazada (días 11 al 15).
  * - Administrador: cambio libre de estatus (RF3.9), sin alterar montos.
  * Al aprobar se generan y persisten las tres firmas hash (RF3.12.7).
  */
@@ -621,6 +700,7 @@ export async function cambiarEstadoEstimacion(
   }
 
   validarRolTransicion(rol, estimacion.estado as EstadoEstimacion, nuevoEstado);
+  validarVentanaTransicion(rol);
 
   if (nuevoEstado === ESTADO_APROBADA) {
     if (rol === 'Residente') {
@@ -712,7 +792,7 @@ export async function rechazarEstimacion(
   idEstimacion: string,
   idUsuario: string,
 ): Promise<Estimacion> {
-  return cambiarEstadoEstimacion(idObra, idEstimacion, ESTADO_DEVUELTA, idUsuario);
+  return cambiarEstadoEstimacion(idObra, idEstimacion, ESTADO_RECHAZADA, idUsuario);
 }
 
 /**
@@ -744,7 +824,7 @@ export async function corregirEstatusEstimacion(
 
 /**
  * RF3.5 / RF3.8 - Candado legal: solo las estimaciones editables
- * (Creada o Devuelta) pueden eliminarse.
+ * (Creada o Rechazada) pueden eliminarse.
  */
 export async function asegurarEstimacionNoAutorizada(
   idObra: string,
