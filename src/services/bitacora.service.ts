@@ -57,6 +57,7 @@ async function asegurarEditablePorFirmas(
   idNota: string,
   idUsuario: string,
   rol: Rol,
+  mensajeFirma = 'No se puede editar o eliminar: ya existe al menos una firma en la nota',
 ): Promise<NotaBitacora> {
   const nota = await obtenerNotaPorId(idNota);
 
@@ -64,13 +65,8 @@ async function asegurarEditablePorFirmas(
     throw new AppError(404, 'Nota de bitácora no encontrada');
   }
 
-  if (nota.estado === ESTADO_COMPLETADA) {
-    throw new AppError(
-      403,
-      'Nota inmutable: una nota completada no puede editarse ni eliminarse',
-    );
-  }
-
+  // RF5.2 / RF5.4 - La inmutabilidad inicia con la primera firma, no hasta
+  // que estén las tres. La nota ya no puede editarse ni eliminarse.
   const tieneAlgunaFirma = Boolean(
     nota.firma_superintendente ||
       nota.firma_supervisor ||
@@ -78,9 +74,13 @@ async function asegurarEditablePorFirmas(
   );
 
   if (tieneAlgunaFirma) {
+    throw new AppError(403, mensajeFirma);
+  }
+
+  if (nota.estado === ESTADO_COMPLETADA) {
     throw new AppError(
       403,
-      'No se puede editar o eliminar: ya existe al menos una firma en la nota',
+      'Nota inmutable: una nota completada no puede editarse ni eliminarse',
     );
   }
 
@@ -122,13 +122,23 @@ export async function editarNota(
   input: EditarNotaDto,
 ): Promise<NotaBitacora> {
   const { rol } = await obtenerUsuarioYRol(idUsuario);
-  await asegurarEditablePorFirmas(idNota, idUsuario, rol);
+  await asegurarEditablePorFirmas(
+    idNota,
+    idUsuario,
+    rol,
+    'La nota no puede editarse porque ya ha comenzado su proceso de firma',
+  );
   return actualizarTextoRepo(idNota, input.texto);
 }
 
 export async function eliminarNota(idNota: string, idUsuario: string): Promise<void> {
   const { rol } = await obtenerUsuarioYRol(idUsuario);
-  await asegurarEditablePorFirmas(idNota, idUsuario, rol);
+  await asegurarEditablePorFirmas(
+    idNota,
+    idUsuario,
+    rol,
+    'No se puede eliminar una nota que ya ha iniciado su proceso de firma',
+  );
   await eliminarNotaRepo(idNota);
 }
 

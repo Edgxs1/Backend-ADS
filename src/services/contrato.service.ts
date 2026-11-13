@@ -9,9 +9,10 @@ import type {
 
 export async function registrarContrato(
   idObra: string,
+  idCreadoPor: string,
   input: RegistrarContratoInput,
 ): Promise<ContratoConContratista> {
-  return registrarContratoRepo(idObra, input);
+  return registrarContratoRepo(idObra, idCreadoPor, input);
 }
 
 export async function consultarContratoPorObra(

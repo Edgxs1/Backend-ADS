@@ -13,9 +13,10 @@ import type {
 
 export async function registrarConcepto(
   idObra: string,
+  idCreadoPor: string,
   input: CrearConceptoInput,
 ): Promise<Concepto> {
-  return crearConceptoRepo(idObra, input);
+  return crearConceptoRepo(idObra, idCreadoPor, input);
 }
 
 export async function listarCatalogosPorObra(idObra: string): Promise<ConceptoConPartida[]> {

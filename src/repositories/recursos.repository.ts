@@ -44,10 +44,12 @@ export async function listarTodosRecursosPorObra(idObra: string): Promise<Recurs
 
 export async function crearRecurso(
   idObra: string,
+  idCreadoPor: string,
   input: { tipo: 'PERSONAL' | 'MAQUINARIA' | 'EQUIPO'; descripcion: string },
 ): Promise<RecursoCatalogo> {
   const payload = {
     id_obra: idObra,
+    id_creado_por: idCreadoPor,
     tipo: input.tipo,
     descripcion: input.descripcion,
     activo: true,

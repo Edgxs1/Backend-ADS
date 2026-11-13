@@ -1,4 +1,9 @@
-import { obtenerContratoPorObra } from '../repositories/contrato.repository.js';
+import {
+  fechaFinConAdendas,
+  listarAdendasPorContrato,
+  obtenerContratoPorObra,
+  sumarAdendasMonto,
+} from '../repositories/contrato.repository.js';
 import {
   listarCatalogoResumen,
   listarDetallesEstimacionesAprobadas,
@@ -238,7 +243,13 @@ export async function obtenerDashboardObra(
     estimaciones.map((estimacion) => estimacion.id_estimacion),
   );
 
-  const importeContrato = contrato?.importe_contrato ?? 0;
+  const adendas = contrato
+    ? await listarAdendasPorContrato(contrato.id_contrato)
+    : [];
+
+  const importeContrato = contrato
+    ? sumarAdendasMonto(Number(contrato.importe_contrato), adendas)
+    : 0;
   const hoy = new Date();
 
   const cantidadesPorConcepto = new Map<string, number>();
@@ -306,7 +317,10 @@ export async function obtenerDashboardObra(
     : avanceFinancieroReal;
 
   const inicio = aFecha(contrato?.periodo_ejecucion_inicio ?? null);
-  const fin = aFecha(contrato?.periodo_ejecucion_fin ?? null);
+  const finVigente = contrato
+    ? fechaFinConAdendas(contrato.periodo_ejecucion_fin, adendas)
+    : null;
+  const fin = aFecha(finVigente);
   const programado = porcentajeProgramado(inicio, fin, hoy);
 
   return {

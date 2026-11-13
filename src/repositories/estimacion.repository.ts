@@ -368,6 +368,10 @@ export async function crearEstimacion(
       .single();
 
     if (errorMontos || !cabeceraActualizada) {
+      if (errorMontos?.message.includes('RF3.11')) {
+        throw new AppError(400, errorMontos.message);
+      }
+
       throw new AppError(500, 'No se pudieron guardar los montos de la estimación');
     }
 
@@ -439,6 +443,10 @@ export async function actualizarEstimacion(
         .single();
 
     if (errorEstimacion || !cabeceraActualizada) {
+      if (errorEstimacion?.message.includes('RF3.11')) {
+        throw new AppError(400, errorEstimacion.message);
+      }
+
       throw new AppError(
         500,
         'No se pudieron actualizar los datos de la estimación',
@@ -768,6 +776,58 @@ export async function obtenerImporteAdicionalAutorizado(
 
   if (errorDetalle) {
     throw new AppError(500, 'No se pudo validar el importe extraordinario acumulado');
+  }
+
+  return (detalles ?? []).reduce(
+    (total, row) => total + Number(row.importe ?? 0),
+    0,
+  );
+}
+
+/**
+ * RF3.11 - Importe comprometido por estimaciones Adicionales/Extraordinarias.
+ *
+ * A diferencia de `obtenerImporteAdicionalAutorizado`, incluye los borradores
+ * en proceso y excluye únicamente las rechazadas. Esto convierte el tope en una
+ * reserva de presupuesto y evita que dos capturas simultáneas consuman el mismo
+ * margen del 25%.
+ */
+export async function obtenerImporteAdicionalComprometido(
+  idObra: string,
+  excluirIdEstimacion?: string,
+): Promise<number> {
+  let consulta = supabaseAdmin
+    .from('estimaciones')
+    .select('id_estimacion')
+    .eq('id_obra', idObra)
+    .in('tipo', [...TIPOS_CON_TOPES_25])
+    .or('estado.neq.Rechazada,estado.is.null');
+
+  if (excluirIdEstimacion) {
+    consulta = consulta.neq('id_estimacion', excluirIdEstimacion);
+  }
+
+  const { data: estimaciones, error } = await consulta;
+
+  if (error) {
+    throw new AppError(500, 'No se pudo validar el importe adicional comprometido');
+  }
+
+  const idsEstimacion = (estimaciones ?? []).map((row) =>
+    String(row.id_estimacion),
+  );
+
+  if (idsEstimacion.length === 0) {
+    return 0;
+  }
+
+  const { data: detalles, error: errorDetalle } = await supabaseAdmin
+    .from('estimacion_conceptos')
+    .select('importe')
+    .in('id_estimacion', idsEstimacion);
+
+  if (errorDetalle) {
+    throw new AppError(500, 'No se pudo validar el importe adicional comprometido');
   }
 
   return (detalles ?? []).reduce(

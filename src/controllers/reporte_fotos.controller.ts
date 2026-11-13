@@ -21,6 +21,11 @@ function requerirParam(req: Request, nombre: string): string {
 export async function subir(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const idReporte = requerirParam(req, 'id_reporte');
+    const idUsuario = req.user?.id;
+
+    if (!idUsuario) {
+      throw new AppError(401, 'No autorizado: usuario no autenticado');
+    }
 
     const archivos = (req.files as Express.Multer.File[] | undefined) ?? [];
 
@@ -30,6 +35,7 @@ export async function subir(req: Request, res: Response, next: NextFunction): Pr
 
     const fotos = await agregarFotos(
       idReporte,
+      idUsuario,
       archivos.map<DatosFoto>((archivo) => ({
         buffer: archivo.buffer,
         mimetype: archivo.mimetype,

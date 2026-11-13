@@ -30,6 +30,7 @@ async function asegurarReporteEditable(idReporte: string): Promise<void> {
 
 export async function agregarFotos(
   idReporte: string,
+  idCreadoPor: string,
   archivos: DatosFoto[],
 ): Promise<FotoReporte[]> {
   if (archivos.length === 0) {
@@ -52,6 +53,7 @@ export async function agregarFotos(
   try {
     return await registrarFotosDB(
       idReporte,
+      idCreadoPor,
       subidas.map((foto) => foto.url),
     );
   } catch (error) {

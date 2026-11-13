@@ -35,7 +35,17 @@ function requerirIdConcepto(req: Request): string {
 
 export async function crear(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const concepto = await registrarConcepto(requerirIdObra(req), req.body as CrearConceptoDto);
+    const idUsuario = req.user?.id;
+
+    if (!idUsuario) {
+      throw new AppError(401, 'No autorizado: usuario no autenticado');
+    }
+
+    const concepto = await registrarConcepto(
+      requerirIdObra(req),
+      idUsuario,
+      req.body as CrearConceptoDto,
+    );
 
     res.status(201).json({ success: true, data: concepto });
   } catch (error) {

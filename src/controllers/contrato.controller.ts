@@ -19,7 +19,17 @@ function requerirIdObra(req: Request): string {
 
 export async function crear(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const contrato = await registrarContrato(requerirIdObra(req), req.body as RegistrarContratoDto);
+    const idUsuario = req.user?.id;
+
+    if (!idUsuario) {
+      throw new AppError(401, 'No autorizado: usuario no autenticado');
+    }
+
+    const contrato = await registrarContrato(
+      requerirIdObra(req),
+      idUsuario,
+      req.body as RegistrarContratoDto,
+    );
 
     res.status(201).json({ success: true, data: contrato });
   } catch (error) {

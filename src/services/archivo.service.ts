@@ -22,6 +22,7 @@ export async function subirArchivo(
   idObra: string,
   idSubidoPor: string,
   tipoDocumento: string,
+  categoriaCarpeta: string,
   archivo: DatosArchivo,
 ): Promise<Archivo> {
   const ruta = construirRuta(idObra, archivo.nombreOriginal);
@@ -31,6 +32,7 @@ export async function subirArchivo(
     id_obra: idObra,
     id_subido_por: idSubidoPor,
     tipo_documento: tipoDocumento,
+    categoria_carpeta: categoriaCarpeta,
     url_archivo: urlArchivo,
   };
 

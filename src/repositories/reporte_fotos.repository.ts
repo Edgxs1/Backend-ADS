@@ -85,11 +85,18 @@ export async function eliminarFotosStorage(rutas: string[]): Promise<void> {
 
 export async function registrarFotosDB(
   idReporte: string,
+  idCreadoPor: string,
   urls: string[],
 ): Promise<FotoReporte[]> {
   const { data, error } = await supabaseAdmin
     .from('reportes_fotos')
-    .insert(urls.map((url) => ({ id_reporte: idReporte, url_foto: url })))
+    .insert(
+      urls.map((url) => ({
+        id_reporte: idReporte,
+        id_creado_por: idCreadoPor,
+        url_foto: url,
+      })),
+    )
     .select(COLUMNS);
 
   if (error || !data) {

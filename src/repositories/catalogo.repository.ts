@@ -73,6 +73,7 @@ async function validarPartidaDeObra(
 
 export async function crearConcepto(
   idObra: string,
+  idCreadoPor: string,
   input: CrearConceptoInput,
 ): Promise<Concepto> {
   await validarPartidaDeObra(idObra, input.id_partida);
@@ -83,6 +84,7 @@ export async function crearConcepto(
     .from('catalogos')
     .insert({
       id_obra: idObra,
+      id_creado_por: idCreadoPor,
       id_partida: input.id_partida,
       tipo: input.tipo,
       clave: input.clave,

@@ -21,7 +21,6 @@ archivoRouter.post(
     'Superintendente',
     'Supervisor',
     'Residente',
-    'Directivo',
     { scope: 'obra' },
   ),
   uploadArchivo,

@@ -8,6 +8,7 @@ export interface Archivo {
   id_obra: string;
   id_subido_por: string;
   tipo_documento: string;
+  categoria_carpeta: string;
   url_archivo: string;
   created_at: string;
 }
@@ -16,11 +17,12 @@ export interface CrearArchivoInput {
   id_obra: string;
   id_subido_por: string;
   tipo_documento: string;
+  categoria_carpeta: string;
   url_archivo: string;
 }
 
 const COLUMNS =
-  'id_archivo, id_obra, id_subido_por, tipo_documento, url_archivo, created_at';
+  'id_archivo, id_obra, id_subido_por, tipo_documento, categoria_carpeta, url_archivo, created_at';
 
 function extraerRutaStorage(url: string): string | null {
   const marcador = `/${BUCKET_EXPEDIENTES}/`;

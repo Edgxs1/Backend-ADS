@@ -22,11 +22,17 @@ const COLUMNS = 'id_partida, id_obra, clave, descripcion';
 
 export async function crearPartida(
   idObra: string,
+  idCreadoPor: string,
   input: CrearPartidaInput,
 ): Promise<Partida> {
   const { data, error } = await supabaseAdmin
     .from('partidas')
-    .insert({ id_obra: idObra, clave: input.clave, descripcion: input.descripcion })
+    .insert({
+      id_obra: idObra,
+      id_creado_por: idCreadoPor,
+      clave: input.clave,
+      descripcion: input.descripcion,
+    })
     .select(COLUMNS)
     .single();
 

@@ -42,8 +42,14 @@ export async function listarRecursosActivos(req: Request, res: Response, next: N
 
 export async function crearRecursos(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const idUsuario = req.user?.id;
+
+    if (!idUsuario) {
+      throw new AppError(401, 'No autorizado: usuario no autenticado');
+    }
+
     const idObra = requerirParam(req, 'id');
-    const recurso = await registrarRecurso(idObra, req.body);
+    const recurso = await registrarRecurso(idObra, idUsuario, req.body);
 
     res.status(201).json({ success: true, data: recurso });
   } catch (error) {

@@ -50,14 +50,11 @@ export async function authMiddleware(
       if (usuarioByEmail) usuario = usuarioByEmail;
     }
 
-    const esConsultaPerfilPropio = req.originalUrl.startsWith('/api/v1/usuarios/me');
-
-    if (usuario && usuario.activo === false && !esConsultaPerfilPropio) {
-      throw new AppError(
-        403,
-        'Cuenta desactivada temporalmente. Contacte al administrador',
-        { code: 'CUENTA_DESACTIVADA' },
-      );
+    // RF1.4 / RNF1.6 - Revocación efectiva de sesiones tras la baja.
+    if (usuario && usuario.activo === false) {
+      throw new AppError(401, 'Usuario desactivado por el Administrador', {
+        code: 'USUARIO_DESACTIVADO',
+      });
     }
 
     if (usuario) {

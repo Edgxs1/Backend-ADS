@@ -35,7 +35,17 @@ function requerirIdPartida(req: Request): string {
 
 export async function crear(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const partida = await registrarPartida(requerirIdObra(req), req.body as CrearPartidaDto);
+    const idUsuario = req.user?.id;
+
+    if (!idUsuario) {
+      throw new AppError(401, 'No autorizado: usuario no autenticado');
+    }
+
+    const partida = await registrarPartida(
+      requerirIdObra(req),
+      idUsuario,
+      req.body as CrearPartidaDto,
+    );
 
     res.status(201).json({ success: true, data: partida });
   } catch (error) {

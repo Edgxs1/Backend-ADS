@@ -16,9 +16,10 @@ export async function obtenerRecursosPorObra(idObra: string): Promise<RecursoCat
 
 export async function registrarRecurso(
   idObra: string,
+  idCreadoPor: string,
   input: { tipo: 'PERSONAL' | 'MAQUINARIA' | 'EQUIPO'; descripcion: string },
 ): Promise<RecursoCatalogo> {
-  return crearRecurso(idObra, input);
+  return crearRecurso(idObra, idCreadoPor, input);
 }
 
 export async function modificarRecurso(

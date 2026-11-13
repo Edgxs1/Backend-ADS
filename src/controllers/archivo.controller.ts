@@ -31,13 +31,22 @@ export async function subir(req: Request, res: Response, next: NextFunction): Pr
       throw new AppError(400, 'No se envió ningún archivo en el campo "archivo"');
     }
 
-    const { tipo_documento: tipoDocumento } = req.body as SubirArchivoDto;
+    const {
+      tipo_documento: tipoDocumento,
+      categoria_carpeta: categoriaCarpeta,
+    } = req.body as SubirArchivoDto;
 
-    const archivo = await subirArchivo(idObra, user.id, tipoDocumento, {
-      buffer: req.file.buffer,
-      mimetype: req.file.mimetype,
-      nombreOriginal: req.file.originalname,
-    });
+    const archivo = await subirArchivo(
+      idObra,
+      user.id,
+      tipoDocumento,
+      categoriaCarpeta,
+      {
+        buffer: req.file.buffer,
+        mimetype: req.file.mimetype,
+        nombreOriginal: req.file.originalname,
+      },
+    );
 
     res.status(201).json({ success: true, data: archivo });
   } catch (error) {

@@ -12,9 +12,10 @@ import type {
 
 export async function registrarPartida(
   idObra: string,
+  idCreadoPor: string,
   input: CrearPartidaInput,
 ): Promise<Partida> {
-  return crearPartidaRepo(idObra, input);
+  return crearPartidaRepo(idObra, idCreadoPor, input);
 }
 
 export async function listarPartidasPorObra(idObra: string): Promise<Partida[]> {

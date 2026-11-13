@@ -14,7 +14,7 @@ import {
   obtenerDetalleEstimacion as obtenerDetalleRepo,
   obtenerEstimacionPorId,
   obtenerEstimacionesPorObra as obtenerEstimacionesRepo,
-  obtenerImporteAdicionalAutorizado,
+  obtenerImporteAdicionalComprometido,
   obtenerPreciosCatalogo,
   eliminarEstimacion as eliminarEstimacionRepo,
 } from '../repositories/estimacion.repository.js';
@@ -24,11 +24,16 @@ import type {
   EstimacionDetalle,
 } from '../repositories/estimacion.repository.js';
 import { findAsignacionActiva } from '../repositories/asignaciones.repository.js';
-import { obtenerContratoPorObra } from '../repositories/contrato.repository.js';
+import {
+  listarAdendasPorContrato,
+  obtenerContratoPorObra,
+  sumarAdendasMonto,
+} from '../repositories/contrato.repository.js';
 import { findUsuarioPorId } from '../repositories/usuarios.repository.js';
 import { createAnonClient } from '../config/supabase.js';
 import { AppError } from '../shared/errors/AppError.js';
 import { generarPaqueteFirmas } from '../shared/crypto/firma.js';
+import { diaActualEnMexico } from '../shared/utils/fecha.js';
 import { aCentavos, aplicarPorcentaje, deCentavos } from '../shared/utils/money.js';
 import { ROL_BY_ID } from '../shared/types/roles.js';
 import type { Rol } from '../shared/types/roles.js';
@@ -164,6 +169,19 @@ async function validarAvanceFisicoReportado(
           importeCentavos,
         )})`,
       );
+      continue;
+    }
+
+    if (avanceFinancieroCentavos > avanceFisicoCentavos) {
+      throw new AppError(
+        400,
+        'El avance financiero cobrado no puede ser mayor al avance físico monetizado validado.',
+        {
+          id_concepto: concepto.id_concepto,
+          avance_financiero_cobrado: concepto.avance_financiero_cobrado,
+          avance_fisico_monetizado: concepto.avance_fisico_monetizado,
+        },
+      );
     }
   }
 
@@ -222,36 +240,67 @@ async function validarLimiteAvanceFisico(
 }
 
 /**
- * RF3.11 - Regla del 25%.
- * Las estimaciones Adicionales/Extraordinarias no pueden exceder el 25%
- * del monto original del contrato (considerando las ya aprobadas).
+ * RF3.11 - Monto vigente del contrato (original + adendas de monto).
+ *
+ * El snapshot conserva el importe original del contrato al momento de capturar
+ * la estimación; las adendas se suman encima para validar siempre contra el
+ * monto vigente.
  */
-async function validarRegla25(
+async function obtenerImporteContratoVigente(
   idObra: string,
-  tipo: TipoEstimacion,
-  importeNuevo: number,
   importeContratoSnapshot?: number | null,
-): Promise<void> {
-  if (!(TIPOS_CON_TOPES_25 as readonly string[]).includes(tipo)) {
-    return;
-  }
+): Promise<number> {
+  const contrato = await obtenerContratoPorObra(idObra);
+  const base =
+    importeContratoSnapshot ??
+    (contrato ? Number(contrato.importe_contrato) : null);
 
-  let importeContrato = importeContratoSnapshot ?? null;
-
-  if (importeContrato === null) {
-    const contrato = await obtenerContratoPorObra(idObra);
-    importeContrato = contrato ? Number(contrato.importe_contrato) : null;
-  }
-
-  if (importeContrato === null || !Number.isFinite(importeContrato)) {
+  if (base === null || !Number.isFinite(base)) {
     throw new AppError(
       400,
       'No existe un contrato registrado para validar el tope del 25%',
     );
   }
 
+  if (!contrato) {
+    return base;
+  }
+
+  const adendas = await listarAdendasPorContrato(contrato.id_contrato);
+
+  return sumarAdendasMonto(base, adendas);
+}
+
+/**
+ * RF3.11 - Regla del 25%.
+ * Las estimaciones Adicionales/Extraordinarias no pueden exceder el 25% del
+ * monto vigente del contrato (original + adendas), considerando el importe
+ * comprometido por las demás estimaciones no rechazadas.
+ *
+ * El trigger `trg_validar_tope_25` repite esta validación dentro de la
+ * transacción de escritura con `SELECT ... FOR UPDATE` para cerrar la
+ * condición de carrera entre peticiones simultáneas.
+ */
+async function validarRegla25(
+  idObra: string,
+  tipo: TipoEstimacion,
+  importeNuevo: number,
+  importeContratoSnapshot?: number | null,
+  excluirIdEstimacion?: string,
+): Promise<void> {
+  if (!(TIPOS_CON_TOPES_25 as readonly string[]).includes(tipo)) {
+    return;
+  }
+
+  const importeContrato = await obtenerImporteContratoVigente(
+    idObra,
+    importeContratoSnapshot,
+  );
   const tope = importeContrato * PORCENTAJE_TOPE_ADICIONAL;
-  const acumulado = await obtenerImporteAdicionalAutorizado(idObra);
+  const acumulado = await obtenerImporteAdicionalComprometido(
+    idObra,
+    excluirIdEstimacion,
+  );
   const total = acumulado + importeNuevo;
 
   if (aCentavos(total) > aCentavos(tope)) {
@@ -427,6 +476,7 @@ export async function actualizarEstimacion(
     input.tipo,
     importeNuevo,
     importeContratoSnapshot,
+    idEstimacion,
   );
 
   const metadataCaratula =
@@ -492,7 +542,7 @@ const MENSAJE_TRASLADO =
   'Fuera de tiempo. El proceso superó los 15 días naturales; la estimación se trasladará al periodo del siguiente mes';
 
 function diaActualDelMes(): number {
-  return new Date().getDate();
+  return diaActualEnMexico();
 }
 
 /**
