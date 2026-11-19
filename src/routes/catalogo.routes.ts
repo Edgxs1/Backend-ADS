@@ -83,7 +83,7 @@ catalogoRouter.post(
   '/:id/recursos',
   authMiddleware,
   validateParams(recursoObraParamsSchema),
-  roleMiddleware('Administrador', { scope: 'obra' }),
+  roleMiddleware('Superintendente', 'Administrador', { scope: 'obra' }),
   validateBody(crearRecursoSchema),
   crearRecursos,
 );
@@ -92,7 +92,7 @@ catalogoRouter.put(
   '/:id/recursos/:id_recurso',
   authMiddleware,
   validateParams(recursoIdParamsSchema),
-  roleMiddleware('Administrador', { scope: 'obra' }),
+  roleMiddleware('Superintendente', 'Administrador', { scope: 'obra' }),
   validateBody(actualizarRecursoSchema),
   actualizarRecursos,
 );
