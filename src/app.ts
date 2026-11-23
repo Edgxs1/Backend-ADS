@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
+import * as helmetModule from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import { env } from './config/env.js';
 import { AppError } from './shared/errors/AppError.js';
@@ -23,6 +23,9 @@ import {
 import { dashboardRouter } from './routes/dashboard.routes.js';
 import { pendientesRouter } from './routes/pendientes.routes.js';
 import { compendioRouter } from './routes/compendio.routes.js';
+
+const helmet =
+  helmetModule.default ?? (helmetModule as unknown as typeof helmetModule.default);
 
 const app = express();
 const frontendUrl = env.FRONTEND_URL.replace(/\/+$/, '');
