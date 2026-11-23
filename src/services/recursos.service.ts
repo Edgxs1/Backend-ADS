@@ -5,6 +5,7 @@ import {
   listarTodosRecursosPorObra,
   type RecursoCatalogo,
 } from '../repositories/recursos.repository.js';
+import { verificarAccesoObra } from '../shared/security/acceso-obra.js';
 
 export async function obtenerRecursosActivosPorObra(idObra: string): Promise<RecursoCatalogo[]> {
   return listarRecursosActivosPorObra(idObra);
@@ -23,8 +24,11 @@ export async function registrarRecurso(
 }
 
 export async function modificarRecurso(
+  idObra: string,
+  idUsuario: string,
   idRecurso: string,
   input: { descripcion?: string; activo?: boolean },
 ): Promise<RecursoCatalogo> {
-  return actualizarRecurso(idRecurso, input);
+  await verificarAccesoObra(idUsuario, idObra);
+  return actualizarRecurso(idObra, idRecurso, input);
 }

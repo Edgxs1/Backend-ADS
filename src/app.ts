@@ -1,9 +1,11 @@
-/// <reference path="./augment-express.d.ts" />
-
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 import { env } from './config/env.js';
+import { AppError } from './shared/errors/AppError.js';
 import { errorMiddleware, notFoundMiddleware } from './middlewares/error.middleware.js';
+import { verifyInternalSecret } from './middlewares/verify-internal-secret.middleware.js';
 import { authRouter } from './routes/auth.routes.js';
 import { obraRouter } from './routes/obra.routes.js';
 import { partidaRouter } from './routes/partida.routes.js';
@@ -23,15 +25,39 @@ import { pendientesRouter } from './routes/pendientes.routes.js';
 import { compendioRouter } from './routes/compendio.routes.js';
 
 const app = express();
+const frontendUrl = env.FRONTEND_URL.replace(/\/+$/, '');
 
-// Ruta de prueba (Health Check)
-app.get('/api/v1/health', (_req, res) => {
-  res.status(200).json({ success: true, data: { message: 'API OK' } });
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 1000,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Demasiadas solicitudes. Intenta de nuevo más tarde.',
+  },
 });
 
-// Middlewares globales
-app.use(cors({ origin: env.FRONTEND_URL }));
+app.disable('x-powered-by');
+app.use(helmet());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (env.NODE_ENV !== 'production' || !origin || origin === frontendUrl) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new AppError(403, 'Origen no permitido por CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-internal-secret'],
+    credentials: true,
+  }),
+);
+app.use('/api/', apiLimiter);
 app.use(express.json());
+app.use(verifyInternalSecret);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -44,7 +70,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rutas de los módulos
+app.get('/api/v1/health', (_req, res) => {
+  res.status(200).json({ success: true, data: { message: 'API OK' } });
+});
+
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/usuarios', usuariosRouter);
 app.use('/api/v1/obras', archivoRouter);

@@ -147,7 +147,10 @@ estimacionDirectaRouter.put(
   '/:id/estado',
   authMiddleware,
   validateParams(estimacionIdParamsSchema),
-  roleMiddleware('Administrador', 'Supervisor', 'Residente'),
+  roleMiddleware('Administrador', 'Supervisor', 'Residente', {
+    scope: 'obra',
+    allowMissingObra: true,
+  }),
   validateBody(cambiarEstadoEstimacionSchema),
   cambiarEstado,
 );
@@ -161,6 +164,7 @@ estimacionDirectaRouter.patch(
     'Superintendente',
     'Supervisor',
     'Residente',
+    { scope: 'obra', allowMissingObra: true },
   ),
   validateBody(cambiarEstadoEstimacionSchema),
   cambiarEstado,
@@ -170,7 +174,7 @@ estimacionDirectaRouter.put(
   '/:id',
   authMiddleware,
   validateParams(estimacionIdParamsSchema),
-  roleMiddleware('Superintendente', { scope: 'obra' }),
+  roleMiddleware('Superintendente', { scope: 'obra', allowMissingObra: true }),
   validateBody(actualizarEstimacionSchema),
   actualizarPorId,
 );

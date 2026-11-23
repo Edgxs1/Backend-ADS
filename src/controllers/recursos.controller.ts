@@ -59,8 +59,15 @@ export async function crearRecursos(req: Request, res: Response, next: NextFunct
 
 export async function actualizarRecursos(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const idObra = requerirParam(req, 'id');
+    const idUsuario = req.user?.id;
+
+    if (!idUsuario) {
+      throw new AppError(401, 'No autorizado: usuario no autenticado');
+    }
+
     const idRecurso = requerirParam(req, 'id_recurso');
-    const recurso = await modificarRecurso(idRecurso, req.body);
+    const recurso = await modificarRecurso(idObra, idUsuario, idRecurso, req.body);
 
     res.status(200).json({ success: true, data: recurso });
   } catch (error) {

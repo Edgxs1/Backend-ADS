@@ -20,6 +20,7 @@ import {
 } from '../repositories/bitacora.repository.js';
 import { createAnonClient, supabaseAdmin } from '../config/supabase.js';
 import { AppError } from '../shared/errors/AppError.js';
+import { verificarAccesoObra } from '../shared/security/acceso-obra.js';
 
 function requerirParam(req: Request, nombre: string): string {
   const raw = req.params[nombre];
@@ -40,6 +41,22 @@ function requerirUsuario(req: Request): string {
   }
 
   return user.id;
+}
+
+async function resolverIdObraNota(req: Request, idNota: string): Promise<string> {
+  const idObraRuta = req.params['id_obra'];
+
+  if (typeof idObraRuta === 'string' && idObraRuta.length > 0) {
+    return idObraRuta;
+  }
+
+  const nota = await obtenerNotaPorId(idNota);
+
+  if (!nota) {
+    throw new AppError(404, 'Nota de bitácora no encontrada');
+  }
+
+  return nota.id_obra;
 }
 
 export async function crear(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -75,26 +92,8 @@ export async function editar(req: Request, res: Response, next: NextFunction): P
     }
 
     const idUsuario = requerirUsuario(req);
-
-    const notaActual = await obtenerNotaPorId(idNota);
-
-    if (!notaActual) {
-      throw new AppError(404, 'Nota de bitácora no encontrada');
-    }
-
-    if (notaActual.id_creador !== idUsuario) {
-      throw new AppError(403, 'Solo el creador puede editar esta nota');
-    }
-
-    if (
-      notaActual.firma_superintendente ||
-      notaActual.firma_supervisor ||
-      notaActual.firma_residente
-    ) {
-      throw new AppError(403, 'La nota ya contiene firmas y no puede ser modificada');
-    }
-
-    const nota = await editarNota(idNota, idUsuario, req.body as EditarNotaDto);
+    const idObra = await resolverIdObraNota(req, idNota);
+    const nota = await editarNota(idObra, idNota, idUsuario, req.body as EditarNotaDto);
 
     res.status(200).json({ success: true, data: nota });
   } catch (error) {
@@ -104,10 +103,11 @@ export async function editar(req: Request, res: Response, next: NextFunction): P
 
 export async function eliminar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const idObra = requerirParam(req, 'id_obra');
     const idNota = requerirParam(req, 'id_nota');
     const idUsuario = requerirUsuario(req);
 
-    await eliminarNota(idNota, idUsuario);
+    await eliminarNota(idObra, idNota, idUsuario);
 
     res.status(200).json({ success: true, data: { id_nota: idNota } });
   } catch (error) {
@@ -121,10 +121,11 @@ export async function cambiarEstado(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const idObra = requerirParam(req, 'id_obra');
     const idNota = requerirParam(req, 'id_nota');
     const idUsuario = requerirUsuario(req);
 
-    const nota = await firmarNotaServicio(idNota, idUsuario);
+    const nota = await firmarNotaServicio(idObra, idNota, idUsuario);
 
     res.status(200).json({ success: true, data: nota });
   } catch (error) {
@@ -164,6 +165,15 @@ export const firmarNotaController = async (req: Request, res: Response) => {
     }
     if (!nota) {
       return res.status(404).json({ success: false, message: 'La nota de bitácora no fue encontrada' });
+    }
+
+    try {
+      await verificarAccesoObra(userId, String(nota.id_obra));
+    } catch (error) {
+      const appError = error as AppError;
+      return res
+        .status(appError.statusCode ?? 500)
+        .json({ success: false, message: appError.message });
     }
 
     let columnaFirma = '';
@@ -264,8 +274,9 @@ export async function firmar(req: Request, res: Response, next: NextFunction): P
     const idUsuario = requerirUsuario(req);
     const { password } = req.body as FirmarNotaDto;
 
-    const idNotaFinal = Array.isArray(idNotaStr) ? idNotaStr[0] : idNotaStr;
-    const nota = await sellarNota(String(idNotaFinal), idUsuario, password);
+    const idNotaFinal = String(Array.isArray(idNotaStr) ? idNotaStr[0] : idNotaStr);
+    const idObra = await resolverIdObraNota(req, idNotaFinal);
+    const nota = await sellarNota(idObra, idNotaFinal, idUsuario, password);
 
     res.status(200).json({ success: true, data: nota });
   } catch (error) {

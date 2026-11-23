@@ -7,7 +7,10 @@ import type { Rol } from '../shared/types/roles.js';
 
 export interface RoleOptions {
   scope?: 'obra' | 'global';
+  allowMissingObra?: boolean;
 }
+
+const METODOS_LECTURA = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 function extraerIdObra(req: Request): string | undefined {
   const candidato = req.params['id_obra'] ?? req.body?.['id_obra'] ?? req.query['id_obra'];
@@ -17,6 +20,9 @@ function extraerIdObra(req: Request): string | undefined {
 export function roleMiddleware(...args: Array<Rol | RoleOptions>): RequestHandler {
   const allowedRoles: Rol[] = [];
   let scope: 'obra' | 'global' = 'obra';
+  const permiteSinObra = args.some(
+    (arg) => typeof arg !== 'string' && arg.allowMissingObra === true,
+  );
 
   for (const arg of args) {
     if (typeof arg === 'string') {
@@ -41,6 +47,10 @@ export function roleMiddleware(...args: Array<Rol | RoleOptions>): RequestHandle
         throw new AppError(403, 'Acceso denegado: no tienes el rol requerido');
       }
 
+      if (!METODOS_LECTURA.has(req.method) && rol === 'Directivo') {
+        throw new AppError(403, 'Acceso denegado: el rol Directivo es de solo lectura');
+      }
+
       if (rol === 'Administrador' || scope === 'global') {
         next();
         return;
@@ -49,6 +59,10 @@ export function roleMiddleware(...args: Array<Rol | RoleOptions>): RequestHandle
       const idObra = extraerIdObra(req);
 
       if (!idObra) {
+        if (!permiteSinObra) {
+          throw new AppError(400, 'Falta el identificador de la obra en la petición');
+        }
+
         next();
         return;
       }

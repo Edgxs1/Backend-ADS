@@ -74,7 +74,7 @@ catalogoRouter.get(
     'Supervisor',
     'Residente',
     'Directivo',
-    { scope: 'obra' },
+    { scope: 'obra', allowMissingObra: true },
   ),
   listarRecursos,
 );
@@ -83,7 +83,10 @@ catalogoRouter.post(
   '/:id/recursos',
   authMiddleware,
   validateParams(recursoObraParamsSchema),
-  roleMiddleware('Superintendente', 'Administrador', { scope: 'obra' }),
+  roleMiddleware('Superintendente', 'Administrador', {
+    scope: 'obra',
+    allowMissingObra: true,
+  }),
   validateBody(crearRecursoSchema),
   crearRecursos,
 );
@@ -92,7 +95,10 @@ catalogoRouter.put(
   '/:id/recursos/:id_recurso',
   authMiddleware,
   validateParams(recursoIdParamsSchema),
-  roleMiddleware('Superintendente', 'Administrador', { scope: 'obra' }),
+  roleMiddleware('Superintendente', 'Administrador', {
+    scope: 'obra',
+    allowMissingObra: true,
+  }),
   validateBody(actualizarRecursoSchema),
   actualizarRecursos,
 );

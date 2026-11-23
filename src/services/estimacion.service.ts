@@ -34,6 +34,7 @@ import { createAnonClient } from '../config/supabase.js';
 import { AppError } from '../shared/errors/AppError.js';
 import { generarPaqueteFirmas } from '../shared/crypto/firma.js';
 import { diaActualEnMexico } from '../shared/utils/fecha.js';
+import { verificarAccesoObra as exigirAccesoObra } from '../shared/security/acceso-obra.js';
 import { aCentavos, aplicarPorcentaje, deCentavos } from '../shared/utils/money.js';
 import { ROL_BY_ID } from '../shared/types/roles.js';
 import type { Rol } from '../shared/types/roles.js';
@@ -435,6 +436,7 @@ function esEstimacionEditable(estado: string): boolean {
 export async function actualizarEstimacion(
   idObra: string,
   idEstimacion: string,
+  idUsuario: string,
   input: ActualizarEstimacionDto,
 ): Promise<EstimacionDetalle> {
   const estimacion = await obtenerEstimacionPorId(idEstimacion);
@@ -442,6 +444,8 @@ export async function actualizarEstimacion(
   if (!estimacion || estimacion.id_obra !== idObra) {
     throw new AppError(404, 'Estimación no encontrada en esta obra');
   }
+
+  await exigirAccesoObra(idUsuario, idObra);
 
   if (estimacion.estado === ESTADO_APROBADA) {
     throw new AppError(
@@ -502,6 +506,7 @@ export async function actualizarEstimacion(
 
 export async function actualizarEstimacionPorId(
   idEstimacion: string,
+  idUsuario: string,
   input: ActualizarEstimacionDto,
 ): Promise<EstimacionDetalle> {
   const estimacion = await obtenerEstimacionPorId(idEstimacion);
@@ -510,7 +515,12 @@ export async function actualizarEstimacionPorId(
     throw new AppError(404, 'Estimación no encontrada');
   }
 
-  return actualizarEstimacion(estimacion.id_obra, idEstimacion, input);
+  return actualizarEstimacion(
+    estimacion.id_obra,
+    idEstimacion,
+    idUsuario,
+    input,
+  );
 }
 
 const TRANSICIONES_PERMITIDAS: Record<EstadoEstimacion, EstadoEstimacion[]> = {
@@ -900,7 +910,9 @@ export async function asegurarEstimacionNoAutorizada(
 export async function eliminarEstimacion(
   idObra: string,
   idEstimacion: string,
+  idUsuario: string,
 ): Promise<void> {
   await asegurarEstimacionNoAutorizada(idObra, idEstimacion);
+  await exigirAccesoObra(idUsuario, idObra);
   await eliminarEstimacionRepo(idEstimacion);
 }

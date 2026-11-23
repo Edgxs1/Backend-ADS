@@ -22,10 +22,23 @@ export const usuariosRouter = Router();
 
 usuariosRouter.use(authMiddleware);
 
+const ROLES_AUTOGESTION = [
+  'Administrador',
+  'Superintendente',
+  'Supervisor',
+  'Residente',
+] as const;
+
 usuariosRouter.get('/me', me);
-usuariosRouter.patch('/perfil', validateBody(actualizarPerfilSchema), actualizarPerfilPropio);
+usuariosRouter.patch(
+  '/perfil',
+  roleMiddleware(...ROLES_AUTOGESTION, { scope: 'global' }),
+  validateBody(actualizarPerfilSchema),
+  actualizarPerfilPropio,
+);
 usuariosRouter.patch(
   '/perfil/contrasena',
+  roleMiddleware(...ROLES_AUTOGESTION, { scope: 'global' }),
   validateBody(cambiarPasswordSchema),
   cambiarPassword,
 );

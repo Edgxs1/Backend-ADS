@@ -6,6 +6,7 @@ import {
   subirArchivoStorage,
 } from '../repositories/archivo.repository.js';
 import type { Archivo, CrearArchivoInput } from '../repositories/archivo.repository.js';
+import { verificarAccesoObra } from '../shared/security/acceso-obra.js';
 
 export interface DatosArchivo {
   buffer: Buffer;
@@ -48,6 +49,11 @@ export async function listarArchivosPorObra(idObra: string): Promise<Archivo[]> 
   return obtenerArchivosPorObra(idObra);
 }
 
-export async function eliminarArchivoPorId(idArchivo: string): Promise<void> {
-  await eliminarArchivoRepo(idArchivo);
+export async function eliminarArchivoPorId(
+  idObra: string,
+  idUsuario: string,
+  idArchivo: string,
+): Promise<void> {
+  await verificarAccesoObra(idUsuario, idObra);
+  await eliminarArchivoRepo(idObra, idArchivo);
 }

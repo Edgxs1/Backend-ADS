@@ -4,7 +4,6 @@ import {
   crear,
   editar,
   eliminar,
-  firmar,
   firmarNotaController,
   listar,
 } from '../controllers/bitacora.controller.js';
@@ -51,7 +50,7 @@ bitacoraRouter.patch(
   '/:id_obra/bitacora/:id_nota',
   authMiddleware,
   validateParams(notaParamsSchema),
-  roleMiddleware('Administrador', ...ROLES_OPERATIVOS),
+  roleMiddleware(...ROLES_OPERATIVOS, { scope: 'obra' }),
   validateBody(editarNotaSchema),
   editar,
 );
@@ -60,7 +59,7 @@ bitacoraRouter.delete(
   '/:id_obra/bitacora/:id_nota',
   authMiddleware,
   validateParams(notaParamsSchema),
-  roleMiddleware('Administrador', ...ROLES_OPERATIVOS),
+  roleMiddleware(...ROLES_OPERATIVOS, { scope: 'obra' }),
   eliminar,
 );
 
@@ -83,7 +82,7 @@ bitacoraRouter.patch(
 bitacoraRouter.post(
   '/:id/firmar',
   authMiddleware,
-  roleMiddleware(...ROLES_FIRMANTES),
+  roleMiddleware(...ROLES_FIRMANTES, { scope: 'obra', allowMissingObra: true }),
   validateBody(firmarNotaSchema),
   firmarNotaController,
 );
@@ -94,7 +93,7 @@ bitacoraNotaRouter.put(
   '/:id',
   authMiddleware,
   validateParams(notaIdParamsSchema),
-  roleMiddleware('Administrador', ...ROLES_OPERATIVOS),
+  roleMiddleware(...ROLES_OPERATIVOS, { scope: 'obra', allowMissingObra: true }),
   validateBody(editarNotaSchema),
   editar,
 );

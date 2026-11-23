@@ -21,6 +21,7 @@ import { ROL_BY_ID } from '../shared/types/roles.js';
 import type { Rol } from '../shared/types/roles.js';
 import type { CrearNotaDto, EditarNotaDto } from '../schemas/bitacora.schemas.js';
 import { generarFirmaBitacora } from '../shared/crypto/firma-bitacora.js';
+import { verificarRegistroDeObraAsignada } from '../shared/security/acceso-obra.js';
 import { env } from '../config/env.js';
 import { createAnonClient } from '../config/supabase.js';
 
@@ -47,17 +48,10 @@ function obtenerColumnaFirmaPorRol(
   return null;
 }
 
-/**
- * RF5.4 - Candado de edición/eliminación.
- * El creador original solo puede editar/eliminar su nota SI Y SOLO SI
- * las tres columnas de firmas están nulas (nadie ha firmado aún).
- * Si ya hay al menos una firma, se bloquea la edición (403).
- */
 async function asegurarEditablePorFirmas(
+  idObra: string,
   idNota: string,
   idUsuario: string,
-  rol: Rol,
-  mensajeFirma = 'No se puede editar o eliminar: ya existe al menos una firma en la nota',
 ): Promise<NotaBitacora> {
   const nota = await obtenerNotaPorId(idNota);
 
@@ -65,8 +59,13 @@ async function asegurarEditablePorFirmas(
     throw new AppError(404, 'Nota de bitácora no encontrada');
   }
 
-  // RF5.2 / RF5.4 - La inmutabilidad inicia con la primera firma, no hasta
-  // que estén las tres. La nota ya no puede editarse ni eliminarse.
+  await verificarRegistroDeObraAsignada(
+    idUsuario,
+    idObra,
+    nota.id_obra,
+    'Nota de bitácora no encontrada en esta obra',
+  );
+
   const tieneAlgunaFirma = Boolean(
     nota.firma_superintendente ||
       nota.firma_supervisor ||
@@ -74,7 +73,7 @@ async function asegurarEditablePorFirmas(
   );
 
   if (tieneAlgunaFirma) {
-    throw new AppError(403, mensajeFirma);
+    throw new AppError(403, 'No se puede eliminar ni modificar una nota con firmas aplicadas.');
   }
 
   if (nota.estado === ESTADO_COMPLETADA) {
@@ -84,14 +83,10 @@ async function asegurarEditablePorFirmas(
     );
   }
 
-  if (rol === 'Administrador') {
-    return nota;
-  }
-
   if (nota.id_creador !== idUsuario) {
     throw new AppError(
       403,
-      'Acceso denegado: solo el creador de la nota o un Administrador pueden modificarla',
+      'Acceso denegado: solo el creador de la nota puede modificarla',
     );
   }
 
@@ -117,32 +112,29 @@ export async function listarNotasPorObra(
 }
 
 export async function editarNota(
+  idObra: string,
   idNota: string,
   idUsuario: string,
   input: EditarNotaDto,
 ): Promise<NotaBitacora> {
-  const { rol } = await obtenerUsuarioYRol(idUsuario);
-  await asegurarEditablePorFirmas(
-    idNota,
-    idUsuario,
-    rol,
-    'La nota no puede editarse porque ya ha comenzado su proceso de firma',
-  );
+  await asegurarEditablePorFirmas(idObra, idNota, idUsuario);
   return actualizarTextoRepo(idNota, input.texto);
 }
 
-export async function eliminarNota(idNota: string, idUsuario: string): Promise<void> {
-  const { rol } = await obtenerUsuarioYRol(idUsuario);
-  await asegurarEditablePorFirmas(
-    idNota,
-    idUsuario,
-    rol,
-    'No se puede eliminar una nota que ya ha iniciado su proceso de firma',
-  );
+export async function eliminarNota(
+  idObra: string,
+  idNota: string,
+  idUsuario: string,
+): Promise<void> {
+  await asegurarEditablePorFirmas(idObra, idNota, idUsuario);
   await eliminarNotaRepo(idNota);
 }
 
-export async function firmarNota(idNota: string, idUsuario: string): Promise<NotaBitacora> {
+export async function firmarNota(
+  idObra: string,
+  idNota: string,
+  idUsuario: string,
+): Promise<NotaBitacora> {
   const { rol, rfc } = await obtenerUsuarioYRol(idUsuario);
   const columnaFirma = obtenerColumnaFirmaPorRol(rol);
 
@@ -162,6 +154,13 @@ export async function firmarNota(idNota: string, idUsuario: string): Promise<Not
   if (!nota) {
     throw new AppError(404, 'Nota de bitácora no encontrada');
   }
+
+  await verificarRegistroDeObraAsignada(
+    idUsuario,
+    idObra,
+    nota.id_obra,
+    'Nota de bitácora no encontrada en esta obra',
+  );
 
   if (nota.estado === ESTADO_COMPLETADA) {
     throw new AppError(403, 'Nota inmutable: la nota ya se encuentra completada');
@@ -189,6 +188,7 @@ export async function firmarNota(idNota: string, idUsuario: string): Promise<Not
 }
 
 export async function sellarNota(
+  idObra: string,
   idNota: string,
   idUsuario: string,
   password: string,
@@ -222,15 +222,18 @@ export async function sellarNota(
     throw new AppError(401, 'Unauthorized');
   }
 
-  console.log('--- DEBUG FIRMA ---');
-  console.log('ID Nota buscado:', idNota);
-  console.log('Usuario intentando firmar:', idUsuario, rol);
   const nota = await obtenerNotaPorId(idNota);
-  console.log('Resultado de la BD:', nota);
 
   if (!nota) {
     throw new AppError(404, 'Nota de bitácora no encontrada');
   }
+
+  await verificarRegistroDeObraAsignada(
+    idUsuario,
+    idObra,
+    nota.id_obra,
+    'Nota de bitácora no encontrada en esta obra',
+  );
 
   if (nota.estado === ESTADO_COMPLETADA) {
     throw new AppError(403, 'Nota inmutable: la nota ya se encuentra completada');

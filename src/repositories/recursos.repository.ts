@@ -69,6 +69,7 @@ export async function crearRecurso(
 }
 
 export async function actualizarRecurso(
+  idObra: string,
   idRecurso: string,
   input: { descripcion?: string; activo?: boolean },
 ): Promise<RecursoCatalogo> {
@@ -80,6 +81,7 @@ export async function actualizarRecurso(
   const { data, error } = await supabaseAdmin
     .from('catalogo_recursos')
     .update(payload)
+    .eq('id_obra', idObra)
     .eq('id_recurso', idRecurso)
     .select(COLUMNS)
     .single();

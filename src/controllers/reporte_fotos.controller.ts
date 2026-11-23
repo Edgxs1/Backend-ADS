@@ -18,14 +18,21 @@ function requerirParam(req: Request, nombre: string): string {
   return valor;
 }
 
+function requerirUsuario(req: Request): string {
+  const idUsuario = req.user?.id;
+
+  if (!idUsuario) {
+    throw new AppError(401, 'No autorizado: usuario no autenticado');
+  }
+
+  return idUsuario;
+}
+
 export async function subir(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const idObra = requerirParam(req, 'id_obra');
     const idReporte = requerirParam(req, 'id_reporte');
-    const idUsuario = req.user?.id;
-
-    if (!idUsuario) {
-      throw new AppError(401, 'No autorizado: usuario no autenticado');
-    }
+    const idUsuario = requerirUsuario(req);
 
     const archivos = (req.files as Express.Multer.File[] | undefined) ?? [];
 
@@ -34,6 +41,7 @@ export async function subir(req: Request, res: Response, next: NextFunction): Pr
     }
 
     const fotos = await agregarFotos(
+      idObra,
       idReporte,
       idUsuario,
       archivos.map<DatosFoto>((archivo) => ({
@@ -51,7 +59,11 @@ export async function subir(req: Request, res: Response, next: NextFunction): Pr
 
 export async function listar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const fotos = await listarFotosPorReporte(requerirParam(req, 'id_reporte'));
+    const fotos = await listarFotosPorReporte(
+      requerirParam(req, 'id_obra'),
+      requerirParam(req, 'id_reporte'),
+      requerirUsuario(req),
+    );
 
     res.status(200).json({ success: true, data: fotos });
   } catch (error) {
@@ -62,7 +74,9 @@ export async function listar(req: Request, res: Response, next: NextFunction): P
 export async function eliminar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     await eliminarFoto(
+      requerirParam(req, 'id_obra'),
       requerirParam(req, 'id_reporte'),
+      requerirUsuario(req),
       requerirParam(req, 'id_foto'),
     );
 

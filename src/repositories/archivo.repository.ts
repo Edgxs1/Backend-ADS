@@ -88,10 +88,11 @@ export async function obtenerArchivosPorObra(idObra: string): Promise<Archivo[]>
   return (data ?? []) as Archivo[];
 }
 
-export async function eliminarArchivo(idArchivo: string): Promise<void> {
+export async function eliminarArchivo(idObra: string, idArchivo: string): Promise<void> {
   const { data, error } = await supabaseAdmin
     .from('archivos_repositorio')
     .select('id_archivo, url_archivo')
+    .eq('id_obra', idObra)
     .eq('id_archivo', idArchivo)
     .maybeSingle();
 
@@ -112,6 +113,7 @@ export async function eliminarArchivo(idArchivo: string): Promise<void> {
   const { error: errorDelete } = await supabaseAdmin
     .from('archivos_repositorio')
     .delete()
+    .eq('id_obra', idObra)
     .eq('id_archivo', idArchivo);
 
   if (errorDelete) {

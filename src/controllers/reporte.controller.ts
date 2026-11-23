@@ -80,10 +80,12 @@ export async function actualizarEstado(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const idObra = requerirParam(req, 'id_obra');
     const idReporte = requerirParam(req, 'id_reporte');
     const idUsuario = requerirUsuario(req);
 
     const reporte = await cambiarEstadoReporte(
+      idObra,
       idReporte,
       idUsuario,
       req.body as CambiarEstadoReporteDto,

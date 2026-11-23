@@ -1,8 +1,10 @@
 import type { NextFunction, Request, Response } from 'express';
 import type {
   ActualizarConceptoDto,
+  CatalogoListadoQueryDto,
   CrearConceptoDto,
 } from '../schemas/catalogo.schemas.js';
+import { catalogoListadoQuerySchema } from '../schemas/catalogo.schemas.js';
 import {
   actualizarConcepto as actualizarConceptoService,
   eliminarConcepto as eliminarConceptoService,
@@ -55,7 +57,16 @@ export async function crear(req: Request, res: Response, next: NextFunction): Pr
 
 export async function listar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const catalogos = await listarCatalogosPorObra(requerirIdObra(req));
+    const consulta = catalogoListadoQuerySchema.safeParse(req.query);
+
+    if (!consulta.success) {
+      throw new AppError(400, 'Parámetros de consulta inválidos', consulta.error.issues);
+    }
+
+    const catalogos = await listarCatalogosPorObra(
+      requerirIdObra(req),
+      consulta.data as CatalogoListadoQueryDto,
+    );
 
     res.status(200).json({ success: true, data: catalogos });
   } catch (error) {
@@ -69,8 +80,15 @@ export async function actualizar(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const idUsuario = req.user?.id;
+
+    if (!idUsuario) {
+      throw new AppError(401, 'No autorizado: usuario no autenticado');
+    }
+
     const concepto = await actualizarConceptoService(
       requerirIdObra(req),
+      idUsuario,
       requerirIdConcepto(req),
       req.body as ActualizarConceptoDto,
     );
@@ -87,7 +105,17 @@ export async function eliminar(
   next: NextFunction,
 ): Promise<void> {
   try {
-    await eliminarConceptoService(requerirIdObra(req), requerirIdConcepto(req));
+    const idUsuario = req.user?.id;
+
+    if (!idUsuario) {
+      throw new AppError(401, 'No autorizado: usuario no autenticado');
+    }
+
+    await eliminarConceptoService(
+      requerirIdObra(req),
+      idUsuario,
+      requerirIdConcepto(req),
+    );
 
     res.status(200).json({ success: true, data: { ok: true } });
   } catch (error) {

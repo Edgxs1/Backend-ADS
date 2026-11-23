@@ -12,15 +12,28 @@ import {
 import type { DatosFoto, FotoReporte } from '../repositories/reporte_fotos.repository.js';
 import { obtenerReportePorId, ESTADO_VALIDADO } from '../repositories/reporte.repository.js';
 import { AppError } from '../shared/errors/AppError.js';
+import { verificarRegistroDeObraAsignada } from '../shared/security/acceso-obra.js';
 
-async function asegurarReporteEditable(idReporte: string): Promise<void> {
+async function asegurarReporteDeObra(
+  idObra: string,
+  idReporte: string,
+  idUsuario: string,
+  exigirEditable: boolean,
+): Promise<void> {
   const reporte = await obtenerReportePorId(idReporte);
 
   if (!reporte) {
     throw new AppError(404, 'Reporte no encontrado');
   }
 
-  if (reporte.estado === ESTADO_VALIDADO) {
+  await verificarRegistroDeObraAsignada(
+    idUsuario,
+    idObra,
+    reporte.id_obra,
+    'Reporte no encontrado en esta obra',
+  );
+
+  if (exigirEditable && reporte.estado === ESTADO_VALIDADO) {
     throw new AppError(
       403,
       'No se pueden modificar fotos de un reporte validado',
@@ -29,6 +42,7 @@ async function asegurarReporteEditable(idReporte: string): Promise<void> {
 }
 
 export async function agregarFotos(
+  idObra: string,
   idReporte: string,
   idCreadoPor: string,
   archivos: DatosFoto[],
@@ -37,7 +51,7 @@ export async function agregarFotos(
     throw new AppError(400, 'No se envió ninguna foto en el campo "fotos"');
   }
 
-  await asegurarReporteEditable(idReporte);
+  await asegurarReporteDeObra(idObra, idReporte, idCreadoPor, true);
 
   const existentes = await contarFotosPorReporte(idReporte);
 
@@ -62,18 +76,22 @@ export async function agregarFotos(
   }
 }
 
-export async function listarFotosPorReporte(idReporte: string): Promise<FotoReporte[]> {
-  const reporte = await obtenerReportePorId(idReporte);
-
-  if (!reporte) {
-    throw new AppError(404, 'Reporte no encontrado');
-  }
-
+export async function listarFotosPorReporte(
+  idObra: string,
+  idReporte: string,
+  idUsuario: string,
+): Promise<FotoReporte[]> {
+  await asegurarReporteDeObra(idObra, idReporte, idUsuario, false);
   return obtenerFotosRepo(idReporte);
 }
 
-export async function eliminarFoto(idReporte: string, idFoto: string): Promise<void> {
-  await asegurarReporteEditable(idReporte);
+export async function eliminarFoto(
+  idObra: string,
+  idReporte: string,
+  idUsuario: string,
+  idFoto: string,
+): Promise<void> {
+  await asegurarReporteDeObra(idObra, idReporte, idUsuario, true);
 
   const foto = await obtenerFotoPorId(idFoto);
 

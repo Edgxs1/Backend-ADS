@@ -12,6 +12,7 @@ import { findUsuarioPorId } from '../repositories/usuarios.repository.js';
 import { AppError } from '../shared/errors/AppError.js';
 import { ROL_BY_ID } from '../shared/types/roles.js';
 import type { Rol } from '../shared/types/roles.js';
+import { verificarRegistroDeObraAsignada } from '../shared/security/acceso-obra.js';
 import type {
   CambiarEstadoReporteDto,
   CrearReporteDto,
@@ -75,6 +76,13 @@ export async function actualizarReporte(
     throw new AppError(404, 'Reporte no encontrado en esta obra');
   }
 
+  await verificarRegistroDeObraAsignada(
+    idUsuario,
+    idObra,
+    reporte.id_obra,
+    'Reporte no encontrado en esta obra',
+  );
+
   if (reporte.estado === ESTADO_VALIDADO) {
     throw new AppError(409, 'No se puede actualizar un reporte ya validado');
   }
@@ -109,6 +117,7 @@ export async function listarReportesPorObra(
 }
 
 export async function cambiarEstadoReporte(
+  idObra: string,
   idReporte: string,
   idUsuario: string,
   input: CambiarEstadoReporteDto,
@@ -138,6 +147,13 @@ export async function cambiarEstadoReporte(
   if (!reporte) {
     throw new AppError(404, 'Reporte no encontrado');
   }
+
+  await verificarRegistroDeObraAsignada(
+    idUsuario,
+    idObra,
+    reporte.id_obra,
+    'Reporte no encontrado en esta obra',
+  );
 
   return actualizarEstadoRepo(idReporte, input.estado);
 }

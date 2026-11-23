@@ -1,5 +1,8 @@
 import { supabaseAdmin } from '../config/supabase.js';
 import { AppError } from '../shared/errors/AppError.js';
+import type { CatalogoListadoQueryDto } from '../schemas/catalogo.schemas.js';
+import { TIPO_CATALOGO_POR_ESTIMACION } from '../schemas/estimacion.schemas.js';
+import { aCentavos, deCentavos } from '../shared/utils/money.js';
 
 export interface Concepto {
   id_concepto: string;
@@ -16,6 +19,9 @@ export interface Concepto {
 
 export interface ConceptoConPartida extends Concepto {
   partida_clave: string | null;
+  cantidad_anterior: number;
+  importe_anterior: number;
+  saldo_cantidad: number;
 }
 
 export interface CrearConceptoInput {
@@ -28,7 +34,7 @@ export interface CrearConceptoInput {
   precio_unitario: number;
 }
 
-export interface ActualizarConceptoInput extends CrearConceptoInput {}
+export type ActualizarConceptoInput = CrearConceptoInput;
 
 interface CatalogoRow extends Concepto {
   partidas: { clave: string } | { clave: string }[] | null;
@@ -104,21 +110,137 @@ export async function crearConcepto(
   return data as Concepto;
 }
 
-export async function obtenerCatalogosPorObra(idObra: string): Promise<ConceptoConPartida[]> {
-  const { data, error } = await supabaseAdmin
+interface AcumuladoPrevio {
+  cantidad: number;
+  importe: number;
+}
+
+async function obtenerAcumuladosPrevios(
+  idObra: string,
+  idsConcepto: string[],
+  fechaCorte: string,
+  excluirIdEstimacion?: string | undefined,
+): Promise<Map<string, AcumuladoPrevio>> {
+  const vacio = new Map<string, AcumuladoPrevio>();
+
+  if (idsConcepto.length === 0) {
+    return vacio;
+  }
+
+  let consultaEstimaciones = supabaseAdmin
+    .from('estimaciones')
+    .select('id_estimacion')
+    .eq('id_obra', idObra)
+    .or('estado.neq.Rechazada,estado.is.null')
+    .lt('fecha', fechaCorte);
+
+  if (excluirIdEstimacion) {
+    consultaEstimaciones = consultaEstimaciones.neq(
+      'id_estimacion',
+      excluirIdEstimacion,
+    );
+  }
+
+  const { data: estimaciones, error: errorEstimaciones } =
+    await consultaEstimaciones;
+
+  if (errorEstimaciones) {
+    throw new AppError(500, 'No se pudieron obtener los acumulados previos');
+  }
+
+  const idsEstimacion = (estimaciones ?? [])
+    .map((estimacion) => estimacion.id_estimacion)
+    .filter((id): id is string => Boolean(id));
+
+  if (idsEstimacion.length === 0) {
+    return vacio;
+  }
+
+  const { data: detalles, error: errorDetalles } = await supabaseAdmin
+    .from('estimacion_conceptos')
+    .select('id_concepto, cantidad_de_esta_estimacion, importe')
+    .in('id_estimacion', idsEstimacion)
+    .in('id_concepto', idsConcepto);
+
+  if (errorDetalles) {
+    throw new AppError(500, 'No se pudieron obtener los acumulados por concepto');
+  }
+
+  const importesPorConcepto = new Map<string, number>();
+
+  for (const detalle of detalles ?? []) {
+    const idConcepto = detalle.id_concepto;
+
+    if (!idConcepto) {
+      continue;
+    }
+
+    const acumulado = vacio.get(idConcepto) ?? { cantidad: 0, importe: 0 };
+    acumulado.cantidad += Number(detalle.cantidad_de_esta_estimacion ?? 0);
+
+    const centavos =
+      importesPorConcepto.get(idConcepto) ??
+      aCentavos(acumulado.importe);
+
+    importesPorConcepto.set(
+      idConcepto,
+      centavos + aCentavos(detalle.importe),
+    );
+    acumulado.importe = deCentavos(importesPorConcepto.get(idConcepto) ?? 0);
+    vacio.set(idConcepto, acumulado);
+  }
+
+  return vacio;
+}
+
+export async function obtenerCatalogosPorObra(
+  idObra: string,
+  opciones?: CatalogoListadoQueryDto,
+): Promise<ConceptoConPartida[]> {
+  const tipoCatalogo = opciones?.tipo_estimacion
+    ? TIPO_CATALOGO_POR_ESTIMACION[opciones.tipo_estimacion]
+    : undefined;
+
+  let consulta = supabaseAdmin
     .from('catalogos')
     .select(`${COLUMNS}, partidas (clave)`)
     .eq('id_obra', idObra)
     .order('clave', { ascending: true });
 
+  if (tipoCatalogo) {
+    consulta = consulta.eq('tipo', tipoCatalogo);
+  }
+
+  const { data, error } = await consulta;
+
   if (error) {
     throw new AppError(500, 'No se pudieron obtener los conceptos');
   }
 
-  return ((data ?? []) as unknown as CatalogoRow[]).map(({ partidas, ...concepto }) => ({
-    ...concepto,
-    partida_clave: extraerPartidaClave(partidas),
-  }));
+  const filas = (data ?? []) as unknown as CatalogoRow[];
+  const fechaCorte = opciones?.fecha_corte;
+  const acumulados = fechaCorte
+    ? await obtenerAcumuladosPrevios(
+        idObra,
+        filas.map((fila) => fila.id_concepto),
+        fechaCorte,
+        opciones?.excluir_id_estimacion,
+      )
+    : new Map<string, AcumuladoPrevio>();
+
+  return filas.map(({ partidas, ...concepto }) => {
+    const acumulado = acumulados.get(concepto.id_concepto);
+    const cantidadAnterior = acumulado?.cantidad ?? 0;
+    const importeAnterior = acumulado?.importe ?? 0;
+
+    return {
+      ...concepto,
+      partida_clave: extraerPartidaClave(partidas),
+      cantidad_anterior: Number(cantidadAnterior.toFixed(2)),
+      importe_anterior: importeAnterior,
+      saldo_cantidad: Number((concepto.cantidad - cantidadAnterior).toFixed(2)),
+    };
+  });
 }
 
 export async function actualizarConcepto(

@@ -77,6 +77,7 @@ export async function actualizar(
     const estimacion = await actualizarEstimacion(
       idObra,
       requerirParam(req, 'id_estimacion'),
+      requerirUsuario(req),
       body,
     );
 
@@ -96,6 +97,7 @@ export async function actualizarPorId(
 
     const estimacion = await actualizarEstimacionPorId(
       requerirParam(req, 'id'),
+      requerirUsuario(req),
       body,
     );
 
@@ -224,7 +226,7 @@ export async function eliminar(req: Request, res: Response, next: NextFunction):
     const idObra = requerirParam(req, 'id_obra');
     const idEstimacion = requerirParam(req, 'id_estimacion');
 
-    await eliminarEstimacion(idObra, idEstimacion);
+    await eliminarEstimacion(idObra, idEstimacion, requerirUsuario(req));
 
     res.status(200).json({ success: true, data: { id_estimacion: idEstimacion } });
   } catch (error) {

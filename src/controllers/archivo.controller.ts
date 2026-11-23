@@ -66,7 +66,14 @@ export async function listar(req: Request, res: Response, next: NextFunction): P
 
 export async function eliminar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await eliminarArchivoPorId(requerirParam(req, 'id_archivo'));
+    const idObra = requerirParam(req, 'id_obra');
+    const idUsuario = req.user?.id;
+
+    if (!idUsuario) {
+      throw new AppError(401, 'No autorizado: usuario no autenticado');
+    }
+
+    await eliminarArchivoPorId(idObra, idUsuario, requerirParam(req, 'id_archivo'));
 
     res.status(200).json({ success: true, data: { message: 'Archivo eliminado' } });
   } catch (error) {
