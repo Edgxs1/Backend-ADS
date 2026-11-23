@@ -1,6 +1,6 @@
-import express from 'express';
+import { createRequire } from 'node:module';
+import express, { type RequestHandler } from 'express';
 import cors from 'cors';
-import * as helmetModule from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import { env } from './config/env.js';
 import { AppError } from './shared/errors/AppError.js';
@@ -24,8 +24,8 @@ import { dashboardRouter } from './routes/dashboard.routes.js';
 import { pendientesRouter } from './routes/pendientes.routes.js';
 import { compendioRouter } from './routes/compendio.routes.js';
 
-const helmet =
-  helmetModule.default ?? (helmetModule as unknown as typeof helmetModule.default);
+const nodeRequire = createRequire(import.meta.url);
+const helmet = nodeRequire('helmet') as () => RequestHandler;
 
 const app = express();
 const frontendUrl = env.FRONTEND_URL.replace(/\/+$/, '');
